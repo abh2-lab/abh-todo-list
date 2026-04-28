@@ -38,12 +38,16 @@ const ResizableImage = Image.extend({
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+function normalizeContent(c: Record<string, any> | null | undefined) {
+  return c && typeof c === 'object' && (c as any).type ? c : ''
+}
+
 const editor = useEditor({
-  content: props.modelValue,
+  content: normalizeContent(props.modelValue),
   editable: props.editable !== false,
   extensions: [
     StarterKit.configure({
-      heading: { levels: [1, 2, 3, 4] },
+      heading: { levels: [1, 2, 3, 4, 5, 6] },
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
@@ -118,7 +122,7 @@ watch(
   () => props.docId,
   () => {
     if (editor.value) {
-      editor.value.commands.setContent(props.modelValue, false)
+      editor.value.commands.setContent(normalizeContent(props.modelValue), false)
       buildToc(editor.value)
     }
   },
