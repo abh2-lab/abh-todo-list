@@ -39,7 +39,8 @@ const ResizableImage = Image.extend({
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 function normalizeContent(c: Record<string, any> | null | undefined) {
-  return c && typeof c === 'object' && (c as any).type ? c : ''
+  if (!c || typeof c !== 'object' || !(c as any).type) return ''
+  return JSON.parse(JSON.stringify(c))
 }
 
 const editor = useEditor({

@@ -21,7 +21,7 @@ function jump(pos: number) {
 }
 
 const indentMap: Record<number, string> = {
-  1: 'pl-0',
+  1: 'pl-2',
   2: 'pl-4',
   3: 'pl-7',
   4: 'pl-10',
