@@ -1,0 +1,41 @@
+{
+  "name": "abh-todo-list",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "node .output/server/index.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "nuxt": "^3.16.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.0.0",
+    "@tiptap/vue-3": "^2.11.5",
+    "@tiptap/pm": "^2.11.5",
+    "@tiptap/starter-kit": "^2.11.5",
+    "@tiptap/extension-task-list": "^2.11.5",
+    "@tiptap/extension-task-item": "^2.11.5",
+    "@tiptap/extension-image": "^2.11.5",
+    "@tiptap/extension-youtube": "^2.11.5",
+    "@tiptap/extension-typography": "^2.11.5",
+    "@tiptap/extension-placeholder": "^2.11.5",
+    "@tiptap/extension-table": "^2.11.5",
+    "@tiptap/extension-table-row": "^2.11.5",
+    "@tiptap/extension-table-cell": "^2.11.5",
+    "@tiptap/extension-table-header": "^2.11.5",
+    "drizzle-orm": "^0.43.1",
+    "pg": "^8.14.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.11",
+    "@nuxtjs/tailwindcss": "^6.13.2",
+    "tailwindcss": "^3.4.17",
+    "drizzle-kit": "^0.31.0",
+    "@tailwindcss/typography": "^0.5.16",
+    "typescript": "^5.8.3"
+  }
+}
