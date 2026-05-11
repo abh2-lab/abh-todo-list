@@ -6,6 +6,8 @@ const props = defineProps<{ editor: Editor | null }>()
 const imageInput = ref<HTMLInputElement | null>(null)
 const showYoutubeModal = ref(false)
 const youtubeUrl = ref('')
+const showLinkModal = ref(false)
+const linkUrl = ref('')
 
 function insertImage(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
@@ -23,6 +25,44 @@ function insertYoutube() {
   props.editor.chain().focus().setYoutubeVideo({ src: youtubeUrl.value.trim() }).run()
   youtubeUrl.value = ''
   showYoutubeModal.value = false
+}
+
+function openLinkModal() {
+  if (!props.editor) return
+  linkUrl.value = (props.editor.getAttributes('link').href as string | undefined) ?? ''
+  showLinkModal.value = true
+}
+
+function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return ''
+  if (
+    trimmed.includes('://') ||
+    trimmed.startsWith('mailto:') ||
+    trimmed.startsWith('tel:') ||
+    trimmed.startsWith('/') ||
+    trimmed.startsWith('#')
+  ) {
+    return trimmed
+  }
+  return `https://${trimmed}`
+}
+
+function applyLink() {
+  if (!props.editor) return
+  const href = normalizeUrl(linkUrl.value)
+  if (!href) {
+    showLinkModal.value = false
+    return
+  }
+  props.editor.chain().focus().extendMarkRange('link').setLink({ href }).run()
+  linkUrl.value = ''
+  showLinkModal.value = false
+}
+
+function removeLink() {
+  if (!props.editor) return
+  props.editor.chain().focus().extendMarkRange('link').unsetLink().run()
 }
 
 type BtnDef = {
@@ -132,6 +172,68 @@ const buttons = computed<BtnDef[]>(() => {
         <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M6 5.5l3 1.5-3 1.5V5.5z" fill="currentColor"/></svg>
       </button>
 
+      <div class="toolbar-sep" />
+
+      <!-- Add / Edit Link -->
+      <button title="Add / Edit Link" class="toolbar-btn" :class="{ active: editor.isActive('link') }" @click="openLinkModal">
+        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M6 8a2.5 2.5 0 003.5 0l2-2A2.5 2.5 0 008 2.5l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6a2.5 2.5 0 00-3.5 0l-2 2A2.5 2.5 0 006 11.5l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <!-- Remove Link (contextual) -->
+      <button v-if="editor.isActive('link')" title="Remove Link" class="toolbar-btn" @click="removeLink">
+        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M6 8a2.5 2.5 0 003.5 0l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6a2.5 2.5 0 00-3.5 0l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 2l10 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+
+      <!-- Insert Table -->
+      <button title="Insert Table" class="toolbar-btn" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">
+        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M1.5 8.5h11M5 2.5v9M8.5 2.5v9" stroke="currentColor" stroke-width="1"/></svg>
+      </button>
+
+      <!-- Contextual table controls -->
+      <template v-if="editor.isActive('table')">
+        <div class="toolbar-sep" />
+
+        <!-- Add Row Above -->
+        <button title="Add Row Above" class="toolbar-btn" :disabled="!editor.can().addRowBefore()" @click="editor.chain().focus().addRowBefore().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="5" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5v7M8.5 5v7" stroke="currentColor" stroke-width="1"/><path d="M7 1v3M5.5 2.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Add Row Below -->
+        <button title="Add Row Below" class="toolbar-btn" :disabled="!editor.can().addRowAfter()" @click="editor.chain().focus().addRowAfter().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M5 2v7M8.5 2v7" stroke="currentColor" stroke-width="1"/><path d="M7 10v3M5.5 11.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Add Column Left -->
+        <button title="Add Column Left" class="toolbar-btn" :disabled="!editor.can().addColumnBefore()" @click="editor.chain().focus().addColumnBefore().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="4" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2v10M4 5h8.5M4 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M1.5 7h3M3 5.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Add Column Right -->
+        <button title="Add Column Right" class="toolbar-btn" :disabled="!editor.can().addColumnAfter()" @click="editor.chain().focus().addColumnAfter().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 2v10M1.5 5h8.5M1.5 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M9.5 7h3M11 5.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Delete Row -->
+        <button title="Delete Row" class="toolbar-btn" :disabled="!editor.can().deleteRow()" @click="editor.chain().focus().deleteRow().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="5" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5v7M8.5 5v7" stroke="currentColor" stroke-width="1"/><path d="M5.5 1.5l3 3M5.5 4.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Delete Column -->
+        <button title="Delete Column" class="toolbar-btn" :disabled="!editor.can().deleteColumn()" @click="editor.chain().focus().deleteColumn().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="4" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2v10M4 5h8.5M4 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M1.5 5.5l3 3M1.5 8.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+
+        <!-- Toggle Header Row -->
+        <button title="Toggle Header Row" class="toolbar-btn" :class="{ active: editor.isActive('tableHeader') }" @click="editor.chain().focus().toggleHeaderRow().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="3" rx="0.5" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/><rect x="1.5" y="5.5" width="11" height="6" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5.5v6M8.5 5.5v6" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+
+        <!-- Delete Table -->
+        <button title="Delete Table" class="toolbar-btn" @click="editor.chain().focus().deleteTable().run()">
+          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="8" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h8M1.5 8.5h8M4.5 2.5v9" stroke="currentColor" stroke-width="1"/><path d="M10.5 2.5l3 3M10.5 5.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        </button>
+      </template>
+
       <div class="flex-1" />
 
       <!-- Undo -->
@@ -171,6 +273,31 @@ const buttons = computed<BtnDef[]>(() => {
         <div class="flex justify-end gap-2 mt-3">
           <button class="text-xs text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showYoutubeModal = false">Cancel</button>
           <button class="text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="insertYoutube">Insert</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Link modal -->
+  <Teleport to="body">
+    <div
+      v-if="showLinkModal"
+      class="fixed inset-0 z-[9998] bg-black/70 flex items-center justify-center"
+      @click.self="showLinkModal = false"
+    >
+      <div class="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 w-80 shadow-2xl">
+        <h3 class="text-sm font-medium text-[#f0f0f0] mb-3">Insert / Edit Link</h3>
+        <input
+          v-model="linkUrl"
+          autofocus
+          class="w-full bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-sm text-[#f0f0f0] placeholder-[#444] outline-none focus:border-[#6366f1] transition-colors"
+          placeholder="https://..."
+          @keydown.enter="applyLink"
+          @keydown.escape="showLinkModal = false"
+        />
+        <div class="flex justify-end gap-2 mt-3">
+          <button class="text-xs text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showLinkModal = false">Cancel</button>
+          <button class="text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="applyLink">Apply</button>
         </div>
       </div>
     </div>

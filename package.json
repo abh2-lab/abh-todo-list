@@ -27,6 +27,7 @@
     "@tiptap/extension-table-row": "^2.11.5",
     "@tiptap/extension-table-cell": "^2.11.5",
     "@tiptap/extension-table-header": "^2.11.5",
+    "@tiptap/extension-link": "^2.11.5",
     "drizzle-orm": "^0.43.1",
     "pg": "^8.14.1"
   },

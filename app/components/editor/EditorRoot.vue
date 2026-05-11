@@ -7,6 +7,11 @@ import Image from '@tiptap/extension-image'
 import Youtube from '@tiptap/extension-youtube'
 import Typography from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
+import Link from '@tiptap/extension-link'
 import ResizableMedia from './ResizableMedia.vue'
 import type { TocHeading } from '~/types/editor'
 
@@ -56,6 +61,20 @@ const editor = useEditor({
     Youtube.configure({ width: 640, height: 360 }),
     Typography,
     Placeholder.configure({ placeholder: 'Start writing…' }),
+    Table.configure({ resizable: true, HTMLAttributes: { class: 'editor-table' } }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    Link.configure({
+      openOnClick: true,
+      autolink: true,
+      linkOnPaste: true,
+      HTMLAttributes: {
+        target: '_blank',
+        rel: 'noopener noreferrer nofollow',
+        class: 'editor-link',
+      },
+    }),
   ],
   editorProps: {
     handlePaste(view, event) {
