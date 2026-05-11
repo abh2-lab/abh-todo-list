@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git -C \"C:/Users/PiNG/Documents/GitHub/abh-todo-list\" worktree list)"
-    ]
-  }
-}
