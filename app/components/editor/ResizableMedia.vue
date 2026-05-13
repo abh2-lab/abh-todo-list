@@ -60,8 +60,8 @@ function startResize(e: MouseEvent, direction: string) {
   <NodeViewWrapper class="relative inline-block my-3 max-w-full">
     <div
       ref="container"
-      class="relative group inline-block overflow-hidden rounded"
-      :style="{ width, height }"
+      class="relative group inline-block overflow-hidden rounded max-w-full"
+      :style="{ width, height, maxWidth: '100%' }"
       :class="{ 'ring-2 ring-[#6366f1]': selected }"
     >
       <!-- Image -->

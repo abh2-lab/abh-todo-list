@@ -121,6 +121,8 @@ function buildToc(e: NonNullable<typeof editor.value>) {
   emit('update:tocHeadings', headings)
 }
 
+const scroller = ref<HTMLElement | null>(null)
+
 function scrollToPos(pos: number) {
   if (!editor.value) return
   const { node } = editor.value.view.domAtPos(pos + 1)
@@ -130,7 +132,7 @@ function scrollToPos(pos: number) {
   el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-defineExpose({ scrollToPos, editor })
+defineExpose({ scrollToPos, editor, scroller })
 
 watch(
   () => props.editable,
@@ -155,7 +157,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="flex-1 overflow-y-auto min-h-0 editor-wrapper">
+  <div ref="scroller" class="flex-1 overflow-y-auto min-h-0 editor-wrapper">
     <EditorContent :editor="editor" />
   </div>
 </template>

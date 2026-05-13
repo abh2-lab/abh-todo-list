@@ -261,7 +261,7 @@ const buttons = computed<BtnDef[]>(() => {
       class="fixed inset-0 z-[9998] bg-black/70 flex items-center justify-center"
       @click.self="showYoutubeModal = false"
     >
-      <div class="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 w-80 shadow-2xl">
+      <div class="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 w-[90vw] max-w-sm shadow-2xl">
         <h3 class="text-sm font-medium text-[#f0f0f0] mb-3">Insert YouTube Video</h3>
         <input
           v-model="youtubeUrl"
@@ -285,7 +285,7 @@ const buttons = computed<BtnDef[]>(() => {
       class="fixed inset-0 z-[9998] bg-black/70 flex items-center justify-center"
       @click.self="showLinkModal = false"
     >
-      <div class="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 w-80 shadow-2xl">
+      <div class="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 w-[90vw] max-w-sm shadow-2xl">
         <h3 class="text-sm font-medium text-[#f0f0f0] mb-3">Insert / Edit Link</h3>
         <input
           v-model="linkUrl"

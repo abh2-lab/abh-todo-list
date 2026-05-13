@@ -3,6 +3,7 @@ import type { TocHeading } from '~/types/editor'
 
 const route = useRoute()
 const id = route.params.id as string
+const isMobile = useIsMobile()
 
 interface FullDoc {
   id: string
@@ -36,7 +37,17 @@ function formatDate(d: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-black overflow-hidden">
+  <!-- Mobile viewer shell (<550px) -->
+  <MobileViewerShell
+    v-if="isMobile"
+    :doc="doc"
+    :toc-headings="tocHeadings"
+    :error="error"
+    @update-toc="tocHeadings = $event"
+  />
+
+  <!-- Desktop / tablet — UNCHANGED from original -->
+  <div v-else class="flex flex-col h-screen bg-black overflow-hidden">
     <!-- View header -->
     <header class="flex items-center justify-between px-5 h-11 border-b border-[#1f1f1f] bg-black shrink-0">
       <div class="flex items-center gap-3">
