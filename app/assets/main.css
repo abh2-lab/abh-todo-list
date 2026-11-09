@@ -284,3 +284,25 @@
   .editor-wrapper .ProseMirror h1 { font-size: 2rem; }
   .editor-wrapper .ProseMirror h2 { font-size: 1.55rem; }
 }
+
+/* ---- Header center, small menus, buttons and the pending badge ---- */
+@layer components {
+  .nav-btn {
+    @apply relative flex items-center gap-1.5 h-8 px-2.5 rounded text-xs text-[#777] whitespace-nowrap shrink-0 transition-colors hover:text-[#f0f0f0] hover:bg-[#1a1a1a];
+  }
+  .nav-btn-active {
+    @apply text-[#818cf8] bg-[#1a1a2e] hover:text-[#818cf8] hover:bg-[#1a1a2e];
+  }
+  .pending-badge {
+    @apply inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-[#ef4444] text-white text-[10px] font-semibold leading-none;
+  }
+  .menu-panel {
+    @apply rounded-lg border border-[#1f1f1f] bg-[#0b0b0b] p-3 shadow-2xl shadow-black;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded border border-[#1f1f1f] bg-[#111] text-[#aaa] whitespace-nowrap transition-colors hover:text-[#f0f0f0] hover:bg-[#1a1a1a];
+  }
+  .btn-accent {
+    @apply border-[#6366f1]/40 bg-[#6366f1]/10 text-[#a5b4fc] hover:bg-[#6366f1]/20 hover:text-[#c7d2fe];
+  }
+}

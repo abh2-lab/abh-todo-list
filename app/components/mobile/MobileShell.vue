@@ -1,35 +1,32 @@
 <script setup lang="ts">
 import type { TocHeading } from '~/types/editor'
+import type { AppView, DocMeta, FullDoc } from '~/types/docs'
 import EditorRootComp from '~/components/editor/EditorRoot.vue'
 
-interface DocMeta {
-  id: string
-  title: string
-  updatedAt: string
-  createdAt: string
-}
-
-interface FullDoc extends DocMeta {
-  content: Record<string, any>
-}
-
 const props = defineProps<{
+  view: AppView
   docs: DocMeta[]
   activeDoc: FullDoc | null
   saveStatus: 'saved' | 'saving' | 'unsaved'
   editorContent: Record<string, any>
   tocHeadings: TocHeading[]
+  pendingCount: number
 }>()
 
 const emit = defineEmits<{
   'select-doc': [id: string]
   'delete-doc': [id: string]
-  'new-doc': []
+  'new-doc': [opts?: { private?: boolean }]
   'update-title': [title: string]
   'update-content': [content: Record<string, any>]
   'update-toc': [headings: TocHeading[]]
   'update-save-status': [status: 'saved' | 'saving' | 'unsaved']
+  'set-shared': [on: boolean]
+  'update:view': [view: AppView]
+  'open-pending': []
 }>()
+
+const { loggedIn } = useUserSession()
 
 const editorRef = ref<InstanceType<typeof EditorRootComp> | null>(null)
 const setEditorRef = (el: any) => { editorRef.value = el }
@@ -76,6 +73,9 @@ watch(() => props.activeDoc?.id, () => {
   })
 })
 
+// The header always shows on the Daily tasks page.
+watch(() => props.view, () => { headerHidden.value = false })
+
 onBeforeUnmount(() => {
   if (scrollEl) scrollEl.removeEventListener('scroll', onScroll)
 })
@@ -89,8 +89,18 @@ function handleSidebarSelect(id: string) {
   sidebarOpen.value = false
 }
 
-function handleNewFromSidebar() {
-  emit('new-doc')
+function handleNewFromSidebar(opts: { private?: boolean }) {
+  emit('new-doc', opts)
+  sidebarOpen.value = false
+}
+
+function handleView(view: AppView) {
+  emit('update:view', view)
+  sidebarOpen.value = false
+}
+
+function handlePending() {
+  emit('open-pending')
   sidebarOpen.value = false
 }
 </script>
@@ -98,20 +108,26 @@ function handleNewFromSidebar() {
 <template>
   <div class="mobile-shell relative h-screen overflow-hidden bg-black">
     <MobileHeader
+      :view="view"
       :title="activeDoc?.title ?? 'Untitled'"
       :save-status="saveStatus"
       :sidebar-open="sidebarOpen"
       :view-mode="viewMode"
       :doc-id="activeDoc?.id ?? null"
+      :is-private="activeDoc?.isPrivate ?? false"
+      :shared="activeDoc?.shared ?? false"
+      :pending-count="pendingCount"
       :hidden="headerHidden"
       @update:title="emit('update-title', $event)"
       @toggle-sidebar="sidebarOpen = !sidebarOpen"
       @toggle-view-mode="viewMode = !viewMode"
       @new-doc="emit('new-doc')"
+      @set-shared="emit('set-shared', $event)"
     />
 
     <!-- Body — slides up when header hides so editor fills viewport -->
     <div
+      v-show="view === 'notes'"
       class="absolute left-0 right-0 bottom-0 flex flex-col transition-[top] duration-200 ease-out min-w-0"
       :class="headerHidden ? 'top-0' : 'top-12'"
     >
@@ -135,6 +151,9 @@ function handleNewFromSidebar() {
       </div>
     </div>
 
+    <!-- Daily tasks -->
+    <TasksView v-if="view === 'tasks'" class="absolute left-0 right-0 bottom-0 top-12" />
+
     <!-- Sidebar backdrop + drawer -->
     <Transition name="fade">
       <div
@@ -147,18 +166,29 @@ function handleNewFromSidebar() {
       <DocSidebar
         v-if="sidebarOpen"
         class="absolute left-0 top-0 bottom-0 z-40"
+        wide
         :docs="docs"
-        :active-id="activeDoc?.id ?? null"
+        :active-id="view === 'notes' ? activeDoc?.id ?? null : null"
+        :logged-in="loggedIn"
         @select="handleSidebarSelect"
         @delete="emit('delete-doc', $event)"
         @new-doc="handleNewFromSidebar"
         @close="sidebarOpen = false"
-      />
+      >
+        <template #top>
+          <MobileNav
+            :view="view"
+            :pending-count="pendingCount"
+            @update:view="handleView"
+            @open-pending="handlePending"
+          />
+        </template>
+      </DocSidebar>
     </Transition>
 
     <!-- Floating TOC button (hidden when something is overlaying) -->
     <MobileFloatingTocButton
-      v-if="tocHeadings.length && !sidebarOpen && !tocOpen"
+      v-if="view === 'notes' && tocHeadings.length && !sidebarOpen && !tocOpen"
       @click="tocOpen = true"
     />
 

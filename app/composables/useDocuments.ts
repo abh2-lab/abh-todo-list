@@ -1,18 +1,9 @@
 import type { TocHeading } from '~/types/editor'
+import type { DocMeta, FullDoc } from '~/types/docs'
 import type EditorRootComp from '~/components/editor/EditorRoot.vue'
 
-interface DocMeta {
-  id: string
-  title: string
-  updatedAt: string
-  createdAt: string
-}
-
-interface FullDoc extends DocMeta {
-  content: Record<string, any>
-}
-
 export function useDocuments() {
+  const { loggedIn } = useUserSession()
   const docs = ref<DocMeta[]>([])
   const activeDoc = ref<FullDoc | null>(null)
   const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
@@ -61,11 +52,35 @@ export function useDocuments() {
     saveStatus.value = 'saved'
   }
 
-  async function newDoc() {
+  /** New note. Logged in: private by default. Logged out: always public. */
+  async function newDoc(opts: { private?: boolean } = {}) {
     await saveNow()
-    const doc = await $fetch<FullDoc>('/api/documents', { method: 'POST' })
+    const makePrivate = loggedIn.value && (opts.private ?? true)
+    const doc = await $fetch<FullDoc>('/api/documents', {
+      method: 'POST',
+      body: { private: makePrivate },
+    })
     docs.value.unshift(doc)
     await loadDoc(doc.id)
+  }
+
+  /** Turn the view-only link of the open private note on or off. */
+  async function setShared(on: boolean) {
+    const id = activeDoc.value?.id
+    if (!id) return
+    const show = (value: boolean) => {
+      if (activeDoc.value?.id === id) activeDoc.value.shared = value
+      const meta = docs.value.find((d) => d.id === id)
+      if (meta) meta.shared = value
+    }
+    // Show the change right away; put it back if the server says no.
+    show(on)
+    try {
+      await $fetch(`/api/documents/${id}`, { method: 'PUT', body: { shared: on } })
+    } catch (e) {
+      show(!on)
+      console.error('Could not change sharing:', e)
+    }
   }
 
   async function deleteDoc(id: string) {
@@ -144,5 +159,6 @@ export function useDocuments() {
     onContentUpdate,
     updateTitle,
     jumpToHeading,
+    setShared,
   }
 }

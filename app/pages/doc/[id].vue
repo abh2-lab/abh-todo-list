@@ -78,7 +78,7 @@ function formatDate(d: string) {
     <!-- Error state -->
     <div v-if="error" class="flex-1 flex flex-col items-center justify-center gap-3 text-center">
       <div class="text-4xl text-[#1f1f1f]">404</div>
-      <div class="text-[#444] text-sm">Document not found or has been deleted.</div>
+      <div class="text-[#444] text-sm">This note can't be opened. It may be private, or it was deleted.</div>
       <NuxtLink to="/" class="text-[#6366f1] text-sm hover:underline">Go back to notes</NuxtLink>
     </div>
 

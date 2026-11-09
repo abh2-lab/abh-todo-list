@@ -5,7 +5,7 @@ export default defineNuxtConfig({
 
   compatibilityDate: '2025-01-01',
 
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', 'nuxt-auth-utils'],
 
   tailwindcss: {
     cssPath: '~/assets/main.css',
