@@ -19,6 +19,14 @@ Do NOT skip the rephrase step even if the task seems small once you read it. The
 
 # Git workflow
 
+## Branches
+
+- `main` = staging. We do testing and improvements on `main`.
+- `live` = production. The production app runs on `live`.
+
+## Rules
+
 - Work on `main` only, until I tell you to create a new branch.
+- Never commit on `live` directly.
 - Don't push commits yourself. I will push them.
-- But do make commits as the work gets done.
+- Make commits as the work gets done.
