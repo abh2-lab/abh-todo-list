@@ -17,7 +17,8 @@ const error = ref(false)
 const tocHeadings = ref<TocHeading[]>([])
 const editorRef = ref<any>(null)
 
-useHead(() => ({ title: doc.value ? `${doc.value.title} — Notes` : 'Notes' }))
+// Tab title: "Rohit - 10 Nov 2026, Tuesday" (only the note name when nobody is logged in).
+usePageTitle(() => (doc.value ? doc.value.title.trim() || 'Untitled' : 'Notes'))
 
 onMounted(async () => {
   try {

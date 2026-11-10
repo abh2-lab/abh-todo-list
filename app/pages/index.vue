@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { AppView } from '~/types/docs'
 
-useHead({ title: 'Notes' })
-
 const isMobile = useIsMobile()
 const route = useRoute()
 const router = useRouter()
@@ -40,6 +38,13 @@ const view = computed<AppView>({
   set: (v) => {
     router.replace({ query: { ...route.query, view: v === 'tasks' ? 'tasks' : undefined } })
   },
+})
+
+// Tab title: "Rohit - 10 Nov 2026, Tuesday", or "Rohit - Daily tasks".
+usePageTitle(() => {
+  if (view.value === 'tasks') return 'Daily tasks'
+  if (!activeDoc.value) return 'Notes'
+  return activeDoc.value.title.trim() || 'Untitled'
 })
 
 const sidebarOpen = ref(false)
