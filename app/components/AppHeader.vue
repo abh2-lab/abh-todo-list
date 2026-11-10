@@ -56,6 +56,7 @@ function onTitleKeydown(e: KeyboardEvent) {
     <!-- Left: same as before (notes list button and the note title) -->
     <div class="flex items-center gap-2.5 min-w-0">
       <button
+        data-tour="menu"
         class="flex items-center justify-center w-8 h-8 rounded hover:bg-[#1a1a1a] transition-colors shrink-0"
         :class="sidebarOpen ? 'text-[#6366f1]' : 'text-[#555] hover:text-[#f0f0f0]'"
         :title="sidebarOpen ? 'Hide notes' : 'Show notes'"
@@ -87,6 +88,7 @@ function onTitleKeydown(e: KeyboardEvent) {
         />
         <button
           v-else
+          data-tour="title"
           class="text-base truncate max-w-sm text-left transition-colors"
           :class="viewMode ? 'text-[#888] cursor-default' : 'text-[#c0c0c0] hover:text-[#f0f0f0]'"
           @click="startEditTitle"
@@ -128,6 +130,7 @@ function onTitleKeydown(e: KeyboardEvent) {
         </div>
 
         <button
+          data-tour="view-mode"
           class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border transition-colors shrink-0"
           :class="viewMode
             ? 'bg-[#6366f1]/10 border-[#6366f1]/30 text-[#818cf8] hover:bg-[#6366f1]/20'
@@ -146,6 +149,7 @@ function onTitleKeydown(e: KeyboardEvent) {
         </button>
 
         <ShareButton
+          data-tour="share"
           :doc-id="docId"
           :is-private="isPrivate"
           :shared="shared"
@@ -154,6 +158,7 @@ function onTitleKeydown(e: KeyboardEvent) {
 
         <button
           class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#888] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors shrink-0"
+          data-tour="new-note"
           title="New document"
           @click="emit('new-doc')"
         >

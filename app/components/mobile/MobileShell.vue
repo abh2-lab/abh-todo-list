@@ -106,6 +106,21 @@ function handlePending() {
   emit('open-pending')
   sidebarOpen.value = false
 }
+
+// ---- Help tour ----
+const tour = useTour()
+function handleHelp() {
+  sidebarOpen.value = false
+  tour.start()
+}
+// During the tour, close the menu and show the toolbar, so the tour can point at things.
+watch(tour.open, (isOpen) => {
+  if (!isOpen) return
+  sidebarOpen.value = false
+  tocOpen.value = false
+  viewMode.value = false
+  headerHidden.value = false
+})
 </script>
 
 <template>
@@ -186,6 +201,7 @@ function handlePending() {
             :pending-count="pendingCount"
             @update:view="handleView"
             @open-pending="handlePending"
+            @open-help="handleHelp"
           />
         </template>
       </DocSidebar>

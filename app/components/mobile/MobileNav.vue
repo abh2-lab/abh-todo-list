@@ -11,6 +11,7 @@ defineProps<{
 const emit = defineEmits<{
   'update:view': [view: AppView]
   'open-pending': []
+  'open-help': []
 }>()
 
 const { loggedIn, user, logout, loginUrl } = useAccount()
@@ -47,6 +48,9 @@ const { loggedIn, user, logout, loginUrl } = useAccount()
           Pending
           <span v-if="pendingCount > 0" class="pending-badge">{{ pendingCount }}</span>
         </button>
+        <button class="nav-btn border border-[#1f1f1f]" title="A short tour of the app" @click="emit('open-help')">
+          Help
+        </button>
       </div>
     </template>
 
@@ -55,6 +59,9 @@ const { loggedIn, user, logout, loginUrl } = useAccount()
       <p class="text-xs text-[#555] mt-2 leading-relaxed">
         Log in to keep private notes and use Daily tasks.
       </p>
+      <button class="nav-btn border border-[#1f1f1f] mt-3" title="A short tour of the app" @click="emit('open-help')">
+        Help: take a short tour
+      </button>
     </template>
   </div>
 </template>

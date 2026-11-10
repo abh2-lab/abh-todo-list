@@ -88,11 +88,49 @@ function onVisibility() {
   if (document.visibilityState === 'visible') checkNewDay()
 }
 
+// ---- Help tour (the Help button). It opens by itself once for someone new. ----
+const tour = useTour()
+
+// During the tour, show a note with its toolbar, so the tour can point at its parts.
+watch(tour.open, (isOpen) => {
+  if (!isOpen) return
+  if (view.value !== 'notes') view.value = 'notes'
+  sidebarOpen.value = false
+  viewMode.value = false
+})
+
+/** Wait until ok() is true (or until maxMs has passed). */
+function whenTrue(ok: () => boolean, maxMs?: number) {
+  return new Promise<void>((resolve) => {
+    if (ok()) return resolve()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const stop = watch(ok, (yes) => {
+      if (!yes) return
+      stop()
+      if (timer) clearTimeout(timer)
+      resolve()
+    })
+    if (maxMs) timer = setTimeout(() => { stop(); resolve() }, maxMs)
+  })
+}
+
+async function maybeStartTour() {
+  // Not when a task's "Open note" link opened this page: that jumps to a line in the note.
+  if (tour.seen() || linkDocId) return
+  // Wait for the note, so the tour has something to point at.
+  await whenTrue(() => !!activeDoc.value, 5000)
+  // The pending popup comes first; the tour opens after it is closed.
+  await whenTrue(() => !pendingOpen.value)
+  setTimeout(() => {
+    if (!pendingOpen.value && !tour.open.value) tour.start()
+  }, 400)
+}
+
 // Google login sends people back with ?login=failed when it did not work.
 const loginFailed = ref(false)
 
 onMounted(() => {
-  checkPending()
+  void checkPending().finally(maybeStartTour)
   dayTimer = setInterval(checkNewDay, 60_000)
   document.addEventListener('visibilitychange', onVisibility)
 
@@ -223,6 +261,9 @@ onBeforeUnmount(() => {
 
     <!-- Pending tasks popup (both phone and desktop) -->
     <TasksPendingPopup :open="pendingOpen" @close="pendingOpen = false" />
+
+    <!-- Help tour (both phone and desktop) -->
+    <HelpTour />
 
     <!-- Google login did not work -->
     <div

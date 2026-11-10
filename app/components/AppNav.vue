@@ -13,6 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const { loggedIn, user, firstName, logout, loginUrl } = useAccount()
+const { start: startTour } = useTour()
 
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
@@ -64,6 +65,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
       <button
         class="nav-btn"
         :class="{ 'nav-btn-active': view === 'tasks' }"
+        data-tour="nav-tasks"
         title="Daily tasks"
         @click="emit('update:view', 'tasks')"
       >
@@ -76,6 +78,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
 
       <button
         class="nav-btn"
+        data-tour="nav-pending"
         :title="pendingCount ? `${pendingCount} pending ${pendingCount === 1 ? 'task' : 'tasks'}` : 'No pending tasks'"
         @click="emit('open-pending')"
       >
@@ -96,7 +99,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
         </svg>
         <span class="hidden lg:inline">Notes</span>
       </span>
-      <a :href="loginUrl" class="btn btn-accent h-8" title="Login with Google to keep private notes and daily tasks">
+      <a :href="loginUrl" class="btn btn-accent h-8" data-tour="login" title="Login with Google to keep private notes and daily tasks">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
           <path d="M8.5 2.5h2.25a1 1 0 011 1v7a1 1 0 01-1 1H8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           <path d="M2 7h6.5M6 4.5L8.5 7 6 9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -104,5 +107,15 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
         Login with Google
       </a>
     </template>
+
+    <!-- Help: a short tour of the app -->
+    <button class="nav-btn" data-tour="help" title="Help: a short tour of the app" @click="startTour">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2"/>
+        <path d="M5.35 5.6a1.7 1.7 0 113.2.75c-.35.6-1.55.95-1.55 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="7" cy="10.15" r=".7" fill="currentColor"/>
+      </svg>
+      <span class="hidden lg:inline">Help</span>
+    </button>
   </nav>
 </template>

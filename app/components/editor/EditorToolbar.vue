@@ -94,7 +94,7 @@ const buttons = computed<BtnDef[]>(() => {
 </script>
 
 <template>
-  <div class="flex items-center gap-0.5 px-3 py-1.5 border-b border-[#1f1f1f] bg-[#0a0a0a] flex-wrap shrink-0 z-10">
+  <div data-tour="toolbar" class="flex items-center gap-0.5 px-3 py-1.5 border-b border-[#1f1f1f] bg-[#0a0a0a] flex-wrap shrink-0 z-10">
     <!-- Heading buttons -->
     <template v-if="editor">
       <button
@@ -150,6 +150,7 @@ const buttons = computed<BtnDef[]>(() => {
       <!-- Today's task: put this line in today's Daily tasks list (click again to take it off) -->
       <button
         v-if="taskMode"
+        data-tour="today-task"
         :title="isOnTaskLine(editor) ? 'Take this line off the Daily tasks list' : 'Today\'s task: add this line to today\'s Daily tasks list'"
         class="toolbar-btn toolbar-btn-label"
         :class="{ active: isOnTaskLine(editor) }"

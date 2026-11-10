@@ -57,6 +57,7 @@ function onTitleKeydown(e: KeyboardEvent) {
   >
     <!-- Sidebar toggle (red dot = you have pending tasks) -->
     <button
+      data-tour="menu"
       class="relative flex items-center justify-center w-9 h-9 rounded hover:bg-[#1a1a1a] transition-colors shrink-0"
       :class="sidebarOpen ? 'text-[#6366f1]' : 'text-[#999]'"
       :title="pendingCount ? `Menu (${pendingCount} pending ${pendingCount === 1 ? 'task' : 'tasks'})` : (sidebarOpen ? 'Hide notes' : 'Show notes')"
@@ -91,6 +92,7 @@ function onTitleKeydown(e: KeyboardEvent) {
       />
       <button
         v-else
+        data-tour="title"
         class="text-sm truncate text-left transition-colors min-w-0"
         :class="viewMode ? 'text-[#888] cursor-default' : 'text-[#c0c0c0]'"
         @click="startEditTitle"
@@ -114,6 +116,7 @@ function onTitleKeydown(e: KeyboardEvent) {
     <template v-if="view === 'notes'">
       <!-- View / Edit toggle -->
       <button
+        data-tour="view-mode"
         class="flex items-center justify-center w-9 h-9 rounded transition-colors shrink-0"
         :class="viewMode
           ? 'text-[#818cf8] bg-[#6366f1]/10'
@@ -132,6 +135,7 @@ function onTitleKeydown(e: KeyboardEvent) {
 
       <!-- Share -->
       <ShareButton
+        data-tour="share"
         compact
         :doc-id="docId"
         :is-private="isPrivate"
@@ -142,6 +146,7 @@ function onTitleKeydown(e: KeyboardEvent) {
       <!-- New doc -->
       <button
         class="flex items-center justify-center w-9 h-9 rounded text-[#999] hover:bg-[#1a1a1a] transition-colors shrink-0"
+        data-tour="new-note"
         title="New document"
         @click="emit('new-doc')"
       >
