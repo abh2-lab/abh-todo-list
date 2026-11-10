@@ -4,7 +4,7 @@ import type { DocMeta } from '~/types/docs'
 const props = defineProps<{
   docs: DocMeta[]
   activeId: string | null
-  /** Logged in: show two groups, "My notes" and "Public notes". */
+  /** Logged in: "My notes" first, public notes folded at the bottom. */
   loggedIn?: boolean
   /** Wider panel (phone menu). */
   wide?: boolean
@@ -17,55 +17,24 @@ const emit = defineEmits<{
   close: []
 }>()
 
-interface Group {
-  key: string
-  label: string | null
-  hint: string
-  docs: DocMeta[]
-  /** Show a + button to make a new note in this group. */
-  addPublic: boolean
-  empty: string
-}
+const myDocs = computed(() => props.docs.filter((d) => d.isPrivate))
+const publicDocs = computed(() => props.docs.filter((d) => !d.isPrivate))
 
-const groups = computed<Group[]>(() => {
-  if (!props.loggedIn) {
-    return [{ key: 'all', label: null, hint: '', docs: props.docs, addPublic: false, empty: '' }]
+// Public notes are closed by default. The choice is kept while the app is open.
+const publicOpen = useState('public-notes-open', () => false)
+onMounted(() => {
+  // The open note is a public note: show it.
+  if (props.loggedIn && props.docs.some((d) => d.id === props.activeId && !d.isPrivate)) {
+    publicOpen.value = true
   }
-  return [
-    {
-      key: 'mine',
-      label: 'My notes',
-      hint: 'only you',
-      docs: props.docs.filter((d) => d.isPrivate),
-      addPublic: false,
-      empty: 'No private notes yet. Click New to make one.',
-    },
-    {
-      key: 'public',
-      label: 'Public notes',
-      hint: 'everyone',
-      docs: props.docs.filter((d) => !d.isPrivate),
-      addPublic: true,
-      empty: 'No public notes.',
-    },
-  ]
 })
 
-function relativeTime(date: string | Date) {
-  const d = typeof date === 'string' ? new Date(date) : date
-  const diff = Date.now() - d.getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days}d ago`
-  return d.toLocaleDateString()
+function pick(id: string) {
+  emit('select', id)
+  emit('close')
 }
 
-function handleDelete(e: MouseEvent, id: string) {
-  e.stopPropagation()
+function handleDelete(id: string) {
   if (confirm('Delete this document? This cannot be undone.')) {
     emit('delete', id)
   }
@@ -85,7 +54,7 @@ function handleDelete(e: MouseEvent, id: string) {
       <span class="text-xs font-semibold text-[#444] uppercase tracking-widest select-none">All Notes</span>
       <button
         class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#777] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors"
-        :title="loggedIn ? 'New private note' : 'New document'"
+        :title="loggedIn ? 'New private note (named with today\'s date)' : 'New document'"
         @click="emit('new-doc', { private: true })"
       >
         <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
@@ -95,21 +64,65 @@ function handleDelete(e: MouseEvent, id: string) {
       </button>
     </div>
 
-    <!-- Doc list -->
-    <div class="flex-1 overflow-y-auto py-1.5">
-      <div v-if="docs.length === 0 && !loggedIn" class="px-4 py-8 text-sm text-[#333] text-center select-none leading-relaxed">
+    <!-- Logged out: one list (all notes are public) -->
+    <div v-if="!loggedIn" class="flex-1 overflow-y-auto py-1.5">
+      <div v-if="docs.length === 0" class="px-4 py-8 text-sm text-[#333] text-center select-none leading-relaxed">
         No documents yet.<br/>Click New to create one.
       </div>
+      <DocSidebarItem
+        v-for="doc in docs"
+        :key="doc.id"
+        :doc="doc"
+        :active="doc.id === activeId"
+        @select="pick(doc.id)"
+        @delete="handleDelete(doc.id)"
+      />
+    </div>
 
-      <template v-for="group in groups" :key="group.key">
-        <div v-if="group.label" class="flex items-center justify-between pl-4 pr-3 pt-3 pb-1.5">
-          <span class="text-[11px] text-[#555] select-none">
-            <span class="font-semibold uppercase tracking-wider">{{ group.label }}</span>
-            <span class="text-[#333]"> · {{ group.hint }}</span>
-          </span>
+    <template v-else>
+      <!-- My notes -->
+      <div class="flex-1 min-h-0 overflow-y-auto py-1.5">
+        <div class="pl-4 pr-3 pt-3 pb-1.5 text-[11px] text-[#555] select-none">
+          <span class="font-semibold uppercase tracking-wider">My notes</span>
+          <span class="text-[#333]"> · only you</span>
+        </div>
+        <div v-if="myDocs.length === 0" class="px-4 py-2 text-xs text-[#333] select-none">
+          No private notes yet. Click New to make one.
+        </div>
+        <DocSidebarItem
+          v-for="doc in myDocs"
+          :key="doc.id"
+          :doc="doc"
+          :active="doc.id === activeId"
+          @select="pick(doc.id)"
+          @delete="handleDelete(doc.id)"
+        />
+      </div>
+
+      <!-- Public notes: at the bottom, closed by default -->
+      <div
+        class="shrink-0 flex flex-col min-h-0 border-t border-[#1f1f1f] bg-[#060606]"
+        :class="publicOpen ? 'max-h-[55%]' : ''"
+      >
+        <div class="flex items-center gap-1 pl-2 pr-3 py-1.5 shrink-0">
           <button
-            v-if="group.addPublic"
-            class="w-6 h-6 flex items-center justify-center rounded text-[#555] hover:text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors"
+            class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-left text-[11px] text-[#555] hover:text-[#999] hover:bg-[#0d0d0d] transition-colors select-none"
+            :aria-expanded="publicOpen"
+            :title="publicOpen ? 'Hide public notes' : 'Show public notes'"
+            @click="publicOpen = !publicOpen"
+          >
+            <svg
+              class="w-2.5 h-2.5 shrink-0 transition-transform"
+              :class="{ 'rotate-90': publicOpen }"
+              viewBox="0 0 10 10" fill="none"
+            >
+              <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="font-semibold uppercase tracking-wider">Public notes</span>
+            <span class="text-[#333] truncate"> · everyone ({{ publicDocs.length }})</span>
+          </button>
+          <button
+            class="w-6 h-6 flex items-center justify-center rounded text-[#555] hover:text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors shrink-0"
             title="New public note (everyone can see and edit it)"
             @click="emit('new-doc', { private: false })"
           >
@@ -119,71 +132,20 @@ function handleDelete(e: MouseEvent, id: string) {
           </button>
         </div>
 
-        <div v-if="group.label && group.docs.length === 0" class="px-4 py-2 text-xs text-[#333] select-none">
-          {{ group.empty }}
-        </div>
-
-        <div
-          v-for="doc in group.docs"
-          :key="doc.id"
-          role="button"
-          tabindex="0"
-          class="group relative flex items-center gap-2.5 w-full px-4 py-2.5 cursor-pointer transition-colors"
-          :class="doc.id === activeId ? 'bg-[#111]' : 'hover:bg-[#0d0d0d]'"
-          @click="emit('select', doc.id); emit('close')"
-          @keydown.enter="emit('select', doc.id); emit('close')"
-        >
-          <!-- Active bar -->
-          <div
-            class="absolute left-0 top-2.5 bottom-2.5 w-0.5 rounded-full transition-colors"
-            :class="doc.id === activeId ? 'bg-[#6366f1]' : 'bg-transparent'"
-          />
-
-          <!-- Icon: lock = private, page = public -->
-          <svg
-            v-if="doc.isPrivate"
-            class="w-3.5 h-3.5 shrink-0 transition-colors mt-0.5"
-            :class="doc.id === activeId ? 'text-[#6366f1]' : 'text-[#333] group-hover:text-[#555]'"
-            viewBox="0 0 14 14" fill="none"
-          >
-            <rect x="3" y="6.25" width="8" height="5.75" rx="1" stroke="currentColor" stroke-width="1.1"/>
-            <path d="M4.75 6.25V4.5a2.25 2.25 0 014.5 0v1.75" stroke="currentColor" stroke-width="1.1"/>
-          </svg>
-          <svg
-            v-else
-            class="w-3.5 h-3.5 shrink-0 transition-colors mt-0.5"
-            :class="doc.id === activeId ? 'text-[#6366f1]' : 'text-[#333] group-hover:text-[#555]'"
-            viewBox="0 0 14 14" fill="none"
-          >
-            <path d="M2.5 2h6l3 3v7h-9V2z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
-            <path d="M8.5 2v3h3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
-          </svg>
-
-          <!-- Title + date -->
-          <div class="flex-1 min-w-0">
-            <div
-              class="text-sm truncate leading-snug transition-colors"
-              :class="doc.id === activeId ? 'text-[#f0f0f0] font-medium' : 'text-[#888] group-hover:text-[#ccc]'"
-            >
-              {{ doc.title || 'Untitled' }}
-            </div>
-            <div class="text-xs text-[#333] mt-0.5 group-hover:text-[#444] transition-colors">
-              {{ relativeTime(doc.updatedAt) }}<span v-if="doc.isPrivate && doc.shared"> · shared link on</span>
-            </div>
+        <div v-if="publicOpen" class="min-h-0 overflow-y-auto pb-1.5">
+          <div v-if="publicDocs.length === 0" class="px-4 py-2 text-xs text-[#333] select-none">
+            No public notes.
           </div>
-
-          <!-- Delete -->
-          <button
-            class="w-6 h-6 flex items-center justify-center rounded text-[#333] hover:text-[#ef4444] hover:bg-[#1a0808] opacity-0 group-hover:opacity-100 transition-all shrink-0"
-            title="Delete"
-            @click.stop="handleDelete($event, doc.id)"
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
+          <DocSidebarItem
+            v-for="doc in publicDocs"
+            :key="doc.id"
+            :doc="doc"
+            :active="doc.id === activeId"
+            @select="pick(doc.id)"
+            @delete="handleDelete(doc.id)"
+          />
         </div>
-      </template>
-    </div>
+      </div>
+    </template>
   </aside>
 </template>
