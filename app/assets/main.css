@@ -356,6 +356,10 @@
   .btn-danger {
     @apply border-[#ef4444]/40 bg-[#ef4444]/10 text-[#fca5a5] hover:bg-[#ef4444]/20 hover:text-[#fecaca];
   }
+  /* A quiet button with no frame, like a link (for example "Open note") */
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-[#777] hover:text-[#f0f0f0] hover:bg-[#1a1a1a];
+  }
   .btn-sm {
     @apply gap-1 px-2 py-1 text-[11px];
   }

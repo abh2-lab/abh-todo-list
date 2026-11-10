@@ -433,35 +433,36 @@ watch(selected, () => {
 
               <!-- Small facts about the task -->
               <div
-                v-if="isPending(t) || t.movedFrom || t.done || t.docId"
+                v-if="isPending(t) || t.movedFrom || t.done"
                 class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
               >
                 <span v-if="isPending(t)" class="text-[#ef4444]">Not done</span>
                 <span v-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
                 <span v-if="t.done" class="text-[#22c55e]/80">{{ tookLabel(t) }}</span>
+              </div>
+
+              <!-- Buttons: move a task that is not done, and open its note -->
+              <div
+                v-if="!selecting && (!t.done || t.docId)"
+                class="flex flex-wrap items-center gap-1.5 mt-1.5"
+                :class="{ 'opacity-50 pointer-events-none': busyId === t.id }"
+              >
+                <template v-if="!t.done">
+                  <button v-if="isPending(t)" class="btn btn-sm btn-accent" @click="moveTo(t, today)">Move to today</button>
+                  <button v-else class="btn btn-sm" title="Move to the next day" @click="moveTo(t, addDays(t.day, 1))">Next day</button>
+                  <button class="btn btn-sm" title="Move to another day" @click="openDatePick(t)">Pick a date</button>
+                </template>
                 <a
-                  v-if="t.docId && !selecting"
+                  v-if="t.docId"
                   :href="noteLink(t)"
                   target="_blank"
                   rel="noopener"
-                  class="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#a5b4fc]"
+                  class="btn btn-sm btn-ghost"
                   title="Open the note at this line (new tab)"
-                  @click.stop
                 >
                   Open note
                   <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </a>
-              </div>
-
-              <!-- Move a task that is not done -->
-              <div
-                v-if="!t.done && !selecting"
-                class="flex flex-wrap items-center gap-1.5 mt-1.5"
-                :class="{ 'opacity-50 pointer-events-none': busyId === t.id }"
-              >
-                <button v-if="isPending(t)" class="btn btn-sm btn-accent" @click="moveTo(t, today)">Move to today</button>
-                <button v-else class="btn btn-sm" title="Move to the next day" @click="moveTo(t, addDays(t.day, 1))">Next day</button>
-                <button class="btn btn-sm" title="Move to another day" @click="openDatePick(t)">Pick a date</button>
               </div>
               <div v-if="datePickId === t.id && !selecting" class="flex flex-wrap items-center gap-1.5 mt-1.5">
                 <input

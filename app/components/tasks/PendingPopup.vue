@@ -68,20 +68,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
           <ul class="overflow-y-auto px-5">
             <li v-for="t in pending" :key="t.id" class="py-3 border-t border-[#161616]">
               <div class="text-sm break-words" :class="t.text ? 'text-[#ddd]' : 'italic text-[#555]'">{{ t.text || 'Empty line' }}</div>
-              <div class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2">
-                <span class="text-[#ef4444]">From {{ shortDay(t.day) }}</span>
-                <a
-                  v-if="t.docId"
-                  :href="noteLink(t)"
-                  target="_blank"
-                  rel="noopener"
-                  class="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#a5b4fc]"
-                  title="Open the note at this line (new tab)"
-                >
-                  Open note
-                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </a>
-              </div>
+              <div class="text-[11px] mt-0.5 text-[#ef4444]">From {{ shortDay(t.day) }}</div>
               <div class="flex flex-wrap gap-2 mt-2" :class="{ 'opacity-50 pointer-events-none': busyId === t.id }">
                 <button class="btn" @click="run(t.id, markDone)">
                   <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -95,6 +82,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                   <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   Delete
                 </button>
+                <a
+                  v-if="t.docId"
+                  :href="noteLink(t)"
+                  target="_blank"
+                  rel="noopener"
+                  class="btn btn-ghost"
+                  title="Open the note at this line (new tab)"
+                >
+                  Open note
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
               </div>
             </li>
           </ul>
