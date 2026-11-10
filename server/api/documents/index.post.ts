@@ -13,7 +13,9 @@ export default defineEventHandler(async (event) => {
   }
 
   // The browser sends today's date as the name of a new private note, like "9 Nov 2026, Monday".
-  const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled'
+  let title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled'
+  // You already have a note with that name: call the new one "9 Nov 2026, Monday_2" (then _3, …).
+  if (userId) title = await freeNoteTitle(userId, title)
 
   const db = useDb()
   const [doc] = await db

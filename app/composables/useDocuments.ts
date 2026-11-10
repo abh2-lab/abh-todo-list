@@ -57,6 +57,7 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
 
   /**
    * New note. Logged in: private by default, named with today's date ("9 Nov 2026, Monday").
+   * If you already have a note with that name, the server names it "9 Nov 2026, Monday_2" (then _3, …).
    * Logged out: always public.
    */
   async function newDoc(opts: { private?: boolean } = {}) {
