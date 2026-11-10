@@ -12,12 +12,15 @@ export default defineEventHandler(async (event) => {
     userId = user.id
   }
 
+  // The browser sends today's date as the name of a new private note, like "9 Nov 2026, Monday".
+  const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled'
+
   const db = useDb()
   const [doc] = await db
     .insert(documents)
     .values({
       id: randomUUID(),
-      title: body.title ?? 'Untitled',
+      title,
       content: body.content ?? {},
       userId,
     })

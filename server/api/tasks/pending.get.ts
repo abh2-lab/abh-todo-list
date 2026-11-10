@@ -9,6 +9,11 @@ export default defineEventHandler(async (event) => {
   return useDb()
     .select(taskColumns)
     .from(tasks)
-    .where(and(eq(tasks.userId, user.id), eq(tasks.done, false), lt(tasks.day, today)))
+    .where(and(
+      eq(tasks.userId, user.id),
+      eq(tasks.inNote, true),
+      eq(tasks.done, false),
+      lt(tasks.day, today),
+    ))
     .orderBy(asc(tasks.day), asc(tasks.createdAt))
 })

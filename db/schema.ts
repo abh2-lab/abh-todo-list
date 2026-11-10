@@ -33,11 +33,19 @@ export const tasks = pgTable('tasks', {
   day: date('day').notNull(),
   done: boolean('done').notNull().default(false),
   doneAt: timestamp('done_at'),
-  // If a pending task was moved to another day: the first day it was planned for.
+  // If the task was moved to another day: the first day it was planned for.
   movedFrom: date('moved_from'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-}, (t) => [index('tasks_user_day_idx').on(t.userId, t.day)])
+  // The note the task line is in ("Today's task" button). The line carries the task id.
+  docId: text('doc_id').references(() => documents.id, { onDelete: 'cascade' }),
+  // false = the line was deleted from the note, so the task is hidden.
+  // It shows again if the line comes back (for example with undo).
+  inNote: boolean('in_note').notNull().default(true),
+}, (t) => [
+  index('tasks_user_day_idx').on(t.userId, t.day),
+  index('tasks_doc_id_idx').on(t.docId),
+])
 
 export type User = typeof users.$inferSelect
 export type Task = typeof tasks.$inferSelect

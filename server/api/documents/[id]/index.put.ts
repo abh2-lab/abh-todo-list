@@ -37,5 +37,16 @@ export default defineEventHandler(async (event) => {
       shared: documents.shared,
     })
   if (!doc) throw createError({ statusCode: 404, message: 'Document not found' })
-  return toClientDoc(doc)
+
+  // Your private note was saved: keep the Daily tasks list in step with its task lines.
+  let tasksChanged = false
+  if (changes.content !== undefined && user && doc.userId === user.id) {
+    try {
+      tasksChanged = (await syncNoteTasks(db, { docId: doc.id, userId: user.id, content: changes.content })) > 0
+    } catch (e) {
+      // The note itself is saved; the list catches up on the next save.
+      console.error('[tasks] could not update the task lines of a note', e)
+    }
+  }
+  return { ...toClientDoc(doc), tasksChanged }
 })
