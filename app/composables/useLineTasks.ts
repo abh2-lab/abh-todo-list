@@ -70,10 +70,22 @@ export function useLineTasks(
     const ask = focusTask.value
     if (!ask || ask.docId !== docId) return
     focusTask.value = null
-    // Wait a moment so the note is drawn before we scroll.
-    setTimeout(() => {
+    const reveal = () => {
+      if (e.isDestroyed || opts.docId() !== docId) return
       if (!revealTaskLine(e, ask.taskId)) showError('This line is not in the note any more.')
-    }, 50)
+    }
+    // The tab was opened in the background: jump when the person looks at it, so they see the line light up.
+    if (document.visibilityState === 'hidden') {
+      const onShow = () => {
+        if (document.visibilityState !== 'visible') return
+        document.removeEventListener('visibilitychange', onShow)
+        setTimeout(reveal, 50)
+      }
+      document.addEventListener('visibilitychange', onShow)
+      return
+    }
+    // Wait a moment so the note is drawn before we jump.
+    setTimeout(reveal, 50)
   }
 
   async function load() {

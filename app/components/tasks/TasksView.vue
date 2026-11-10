@@ -139,6 +139,7 @@ async function toggleDone(t: Task) {
   const done = !t.done
   t.done = done // show it right away
   actionError.value = ''
+  notice.value = null
   try {
     Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { done } }))
     void tasksChanged() // the note ticks its checklist line too
@@ -204,6 +205,7 @@ async function removeTask(t: Task) {
     : 'Delete this task?'
   if (!confirm(ask)) return
   actionError.value = ''
+  notice.value = null
   try {
     await $fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })
     tasks.value = tasks.value.filter((x) => x.id !== t.id)
@@ -247,12 +249,14 @@ async function bulk(action: 'done' | 'delete') {
   if (list.length === 0 || bulkBusy.value) return
   if (action === 'delete') {
     const n = list.length
+    const lines = list.filter((t) => t.docId).length
     const ask = `Remove ${n} ${n === 1 ? 'task' : 'tasks'} from the list?`
-      + (list.some((t) => t.docId) ? ' The lines stay in your notes.' : '')
+      + (lines === 1 ? ' The line stays in your note.' : lines > 1 ? ' The lines stay in your notes.' : '')
     if (!confirm(ask)) return
   }
   bulkBusy.value = true
   actionError.value = ''
+  notice.value = null
   try {
     await $fetch('/api/tasks/bulk', { method: 'POST', body: { ids: list.map((t) => t.id), action } })
     stopSelect()
@@ -397,15 +401,18 @@ watch(selected, () => {
             @click="selecting && togglePick(t)"
           >
             <!-- Select box (select mode) or done box -->
-            <span
+            <button
               v-if="selecting"
+              type="button"
               class="mt-0.5 w-[18px] h-[18px] shrink-0 rounded border flex items-center justify-center transition-colors"
-              :class="picked.has(t.id) ? 'bg-[#6366f1] border-[#6366f1] text-white' : 'border-[#444]'"
+              :class="picked.has(t.id) ? 'bg-[#6366f1] border-[#6366f1] text-white' : 'border-[#444] hover:border-[#6366f1]'"
               role="checkbox"
               :aria-checked="picked.has(t.id)"
+              :aria-label="`Select: ${t.text || 'Empty line'}`"
+              @click.stop="togglePick(t)"
             >
               <svg v-if="picked.has(t.id)" width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </span>
+            </button>
             <button
               v-else
               class="mt-0.5 w-[18px] h-[18px] shrink-0 rounded border flex items-center justify-center transition-colors"
@@ -462,6 +469,7 @@ watch(selected, () => {
                   v-model="pickedDate"
                   type="date"
                   :min="today"
+                  aria-label="New day for this task"
                   class="bg-[#0a0a0a] border border-[#1f1f1f] rounded px-2 py-1 text-xs text-[#f0f0f0] outline-none focus:border-[#6366f1] [color-scheme:dark]"
                   @keydown.enter.prevent="confirmDatePick(t)"
                   @keydown.esc="datePickId = null"

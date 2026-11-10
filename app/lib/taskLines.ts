@@ -389,8 +389,9 @@ export function revealTaskLine(editor: Editor, id: string): boolean {
   })
   if (found < 0) return false
 
+  // A plain jump (a smooth scroll does not run while the window is not being drawn).
   const dom = editor.view.nodeDOM(found)
-  if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  if (dom instanceof HTMLElement) dom.scrollIntoView({ block: 'center' })
 
   const storage = storageOf(editor)
   storage.flashId = id
