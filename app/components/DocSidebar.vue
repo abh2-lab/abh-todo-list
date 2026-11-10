@@ -51,7 +51,10 @@ function handleDelete(id: string) {
 
     <!-- Header -->
     <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-[#161616] shrink-0">
-      <span class="text-xs font-semibold text-[#444] uppercase tracking-widest select-none">All Notes</span>
+      <span class="flex items-center gap-2 text-xs font-semibold text-[#444] uppercase tracking-widest select-none">
+        <img src="/favicon.svg" alt="" width="18" height="18" class="shrink-0">
+        All Notes
+      </span>
       <button
         class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#777] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors"
         :title="loggedIn ? 'New private note (named with today\'s date)' : 'New document'"
