@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Task } from '~/types/tasks'
+
 // List of pending tasks (day is over, still not done).
 // Opens by itself once a day, or from the Pending button.
 const props = defineProps<{ open: boolean }>()
@@ -20,8 +22,16 @@ async function run(id: string, action: (id: string) => Promise<void>) {
   }
 }
 
-function remove(id: string) {
-  if (confirm('Delete this task?')) run(id, removeTask)
+function remove(t: Task) {
+  const ask = t.docId
+    ? 'Remove this task from the list? The line stays in your note.'
+    : 'Delete this task?'
+  if (confirm(ask)) run(t.id, removeTask)
+}
+
+/** "Open note" opens the note in a new tab, at the task's line. */
+function noteLink(t: Task) {
+  return `/?doc=${encodeURIComponent(t.docId!)}&task=${encodeURIComponent(t.id)}`
 }
 
 function onKey(e: KeyboardEvent) {
@@ -57,8 +67,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
           <ul class="overflow-y-auto px-5">
             <li v-for="t in pending" :key="t.id" class="py-3 border-t border-[#161616]">
-              <div class="text-sm text-[#ddd] break-words">{{ t.text }}</div>
-              <div class="text-[11px] text-[#ef4444] mt-0.5">From {{ shortDay(t.day) }}</div>
+              <div class="text-sm break-words" :class="t.text ? 'text-[#ddd]' : 'italic text-[#555]'">{{ t.text || 'Empty line' }}</div>
+              <div class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2">
+                <span class="text-[#ef4444]">From {{ shortDay(t.day) }}</span>
+                <a
+                  v-if="t.docId"
+                  :href="noteLink(t)"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#a5b4fc]"
+                  title="Open the note at this line (new tab)"
+                >
+                  Open note
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+              </div>
               <div class="flex flex-wrap gap-2 mt-2" :class="{ 'opacity-50 pointer-events-none': busyId === t.id }">
                 <button class="btn" @click="run(t.id, markDone)">
                   <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -68,7 +91,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                   <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   Move to today
                 </button>
-                <button class="btn" title="Delete task" @click="remove(t.id)">
+                <button class="btn" :title="t.docId ? 'Remove from the list (the line stays in the note)' : 'Delete task'" @click="remove(t)">
                   <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   Delete
                 </button>

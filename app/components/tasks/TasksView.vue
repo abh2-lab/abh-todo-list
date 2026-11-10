@@ -3,7 +3,8 @@ import type { Task } from '~/types/tasks'
 
 // Daily tasks: a month calendar (left) and the tasks of the chosen day (right).
 // On small screens the list goes under the calendar.
-const { tasksVersion, refreshPending } = usePendingTasks()
+// Tasks are made in notes (the "Today's task" button). Their text is changed in the note.
+const { tasksVersion, tasksChanged } = usePendingTasks()
 
 const today = ref(todayKey())
 const selected = ref(today.value)
@@ -60,6 +61,16 @@ function dotClass(t: Task) {
   return 'bg-[#4a4a4a]'
 }
 
+function tookLabel(t: Task) {
+  const n = tookDays(t)
+  return n === null ? '' : `took ${n} ${n === 1 ? 'day' : 'days'}`
+}
+
+/** "Open note" opens the note in a new tab, at the task's line. */
+function noteLink(t: Task) {
+  return `/?doc=${encodeURIComponent(t.docId!)}&task=${encodeURIComponent(t.id)}`
+}
+
 let loadToken = 0
 async function load() {
   const token = ++loadToken
@@ -79,16 +90,27 @@ async function load() {
 }
 
 watch(grid, load)
-// A task was changed somewhere else (for example in the pending popup).
+// A task was changed somewhere else (a note, the pending popup, another tab).
 watch(tasksVersion, load)
 
 // Keep "today" right when the app stays open past midnight.
 let timer: ReturnType<typeof setInterval> | null = null
+// Back to this tab: tasks may have changed in a note in another tab.
+function onVisible() {
+  if (document.visibilityState === 'visible') {
+    today.value = todayKey()
+    load()
+  }
+}
 onMounted(() => {
   load()
   timer = setInterval(() => { today.value = todayKey() }, 60_000)
+  document.addEventListener('visibilitychange', onVisible)
 })
-onBeforeUnmount(() => { if (timer) clearInterval(timer) })
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer)
+  document.removeEventListener('visibilitychange', onVisible)
+})
 
 function pickDay(key: string) {
   selected.value = key
@@ -108,90 +130,147 @@ function goToday() {
   pickDay(today.value)
 }
 
-// ---- Add, tick, edit, move, delete ----
-const newText = ref('')
-const adding = ref(false)
+// ---- Tick, move, delete ----
 const actionError = ref('')
-
-async function addTask() {
-  const text = newText.value.trim()
-  if (!text) {
-    actionError.value = 'Write the task first.'
-    return
-  }
-  if (adding.value) return
-  adding.value = true
-  actionError.value = ''
-  try {
-    const task = await $fetch<Task>('/api/tasks', { method: 'POST', body: { text, day: selected.value } })
-    tasks.value.push(task)
-    newText.value = ''
-    if (task.day < today.value) refreshPending()
-  } catch {
-    actionError.value = 'Could not add the task. Try again.'
-  } finally {
-    adding.value = false
-  }
-}
+const notice = ref<{ text: string; day: string } | null>(null)
+const busyId = ref<string | null>(null)
 
 async function toggleDone(t: Task) {
   const done = !t.done
   t.done = done // show it right away
+  actionError.value = ''
   try {
     Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { done } }))
-    refreshPending()
+    void tasksChanged() // the note ticks its checklist line too
   } catch {
     t.done = !done
     actionError.value = 'Could not save. Try again.'
   }
 }
 
-async function moveToToday(t: Task) {
+async function moveTo(t: Task, day: string) {
+  if (busyId.value) return
+  busyId.value = t.id
+  actionError.value = ''
+  notice.value = null
   try {
-    Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { day: todayKey() } }))
-    refreshPending()
+    Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { day } }))
+    notice.value = { text: `Moved to ${shortDay(day)}.`, day }
+    void tasksChanged()
   } catch {
     actionError.value = 'Could not move the task. Try again.'
+  } finally {
+    busyId.value = null
   }
+}
+
+// "Pick a date": a small date box under the task
+const datePickId = ref<string | null>(null)
+const pickedDate = ref('')
+let datePickFocused: string | null = null
+
+function openDatePick(t: Task) {
+  datePickId.value = t.id
+  datePickFocused = null
+  pickedDate.value = addDays(t.day < today.value ? today.value : t.day, 1)
+}
+
+// Focus the date box (and open the calendar) once, when it shows.
+function focusDateInput(el: unknown) {
+  if (!(el instanceof HTMLInputElement) || datePickFocused === datePickId.value) return
+  datePickFocused = datePickId.value
+  el.focus()
+  try {
+    ;(el as HTMLInputElement & { showPicker?: () => void }).showPicker?.()
+  } catch {
+    // Some browsers only open the calendar on a click. The box is still there.
+  }
+}
+
+function confirmDatePick(t: Task) {
+  const day = pickedDate.value
+  if (!day) return
+  if (day < today.value) {
+    actionError.value = 'Pick today or a later day.'
+    return
+  }
+  datePickId.value = null
+  if (day !== t.day) void moveTo(t, day)
 }
 
 async function removeTask(t: Task) {
-  if (!confirm('Delete this task?')) return
+  const ask = t.docId
+    ? 'Remove this task from the list? The line stays in your note.'
+    : 'Delete this task?'
+  if (!confirm(ask)) return
+  actionError.value = ''
   try {
     await $fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })
     tasks.value = tasks.value.filter((x) => x.id !== t.id)
-    refreshPending()
+    void tasksChanged()
   } catch {
-    actionError.value = 'Could not delete the task. Try again.'
+    actionError.value = 'Could not remove the task. Try again.'
   }
 }
 
-const editingId = ref<string | null>(null)
-const editText = ref('')
+// ---- Select many: mark done or delete together ----
+const selecting = ref(false)
+const picked = ref(new Set<string>())
+const pickedTasks = computed(() => dayTasks.value.filter((t) => picked.value.has(t.id)))
+const allPicked = computed(() => dayTasks.value.length > 0 && pickedTasks.value.length === dayTasks.value.length)
+const bulkBusy = ref(false)
 
-function startEdit(t: Task) {
-  editingId.value = t.id
-  editText.value = t.text
+function startSelect() {
+  selecting.value = true
+  picked.value = new Set()
+  datePickId.value = null
 }
 
-async function saveEdit(t: Task) {
-  if (editingId.value !== t.id) return
-  editingId.value = null
-  const text = editText.value.trim()
-  if (!text || text === t.text) return
-  const old = t.text
-  t.text = text
+function stopSelect() {
+  selecting.value = false
+  picked.value = new Set()
+}
+
+function togglePick(t: Task) {
+  const next = new Set(picked.value)
+  if (next.has(t.id)) next.delete(t.id)
+  else next.add(t.id)
+  picked.value = next
+}
+
+function togglePickAll() {
+  picked.value = allPicked.value ? new Set() : new Set(dayTasks.value.map((t) => t.id))
+}
+
+async function bulk(action: 'done' | 'delete') {
+  const list = pickedTasks.value
+  if (list.length === 0 || bulkBusy.value) return
+  if (action === 'delete') {
+    const n = list.length
+    const ask = `Remove ${n} ${n === 1 ? 'task' : 'tasks'} from the list?`
+      + (list.some((t) => t.docId) ? ' The lines stay in your notes.' : '')
+    if (!confirm(ask)) return
+  }
+  bulkBusy.value = true
+  actionError.value = ''
   try {
-    await $fetch(`/api/tasks/${t.id}`, { method: 'PUT', body: { text } })
+    await $fetch('/api/tasks/bulk', { method: 'POST', body: { ids: list.map((t) => t.id), action } })
+    stopSelect()
+    await tasksChanged()
   } catch {
-    t.text = old
-    actionError.value = 'Could not save. Try again.'
+    actionError.value = action === 'done' ? 'Could not mark them done. Try again.' : 'Could not remove them. Try again.'
+  } finally {
+    bulkBusy.value = false
   }
 }
 
-function focusInput(el: unknown) {
-  if (el instanceof HTMLInputElement && document.activeElement !== el) el.focus()
-}
+// Another day: start fresh.
+watch(selected, () => {
+  stopSelect()
+  datePickId.value = null
+  actionError.value = ''
+  notice.value = null
+})
 </script>
 
 <template>
@@ -262,33 +341,73 @@ function focusInput(el: unknown) {
 
       <!-- Tasks of the chosen day -->
       <section class="lg:flex-1 min-w-0 w-full self-start rounded-xl border border-[#1f1f1f] bg-[#080808] p-4">
-        <div class="flex items-center gap-2">
-          <h3 class="text-sm font-medium text-[#e0e0e0]">{{ longDay(selected) }}</h3>
-          <span v-if="selected === today" class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
-        </div>
-        <div class="text-xs text-[#555] mt-0.5 mb-3">
-          {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day yet.' }}
+        <div class="flex items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-medium text-[#e0e0e0]">{{ longDay(selected) }}</h3>
+              <span v-if="selected === today" class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
+            </div>
+            <div class="text-xs text-[#555] mt-0.5">
+              {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day.' }}
+            </div>
+          </div>
+          <button v-if="dayTasks.length && !selecting" class="btn btn-sm shrink-0" @click="startSelect">Select</button>
         </div>
 
-        <form class="flex gap-2" @submit.prevent="addTask">
-          <input
-            v-model="newText"
-            maxlength="500"
-            placeholder="Add a task"
-            class="flex-1 min-w-0 bg-[#0a0a0a] border border-[#1f1f1f] rounded-lg px-3 py-2 text-sm text-[#f0f0f0] placeholder-[#444] outline-none focus:border-[#6366f1] transition-colors"
-            @input="actionError = ''"
-          />
-          <button type="submit" class="btn btn-accent" :class="{ 'opacity-60': adding }">Add</button>
-        </form>
+        <!-- Select many -->
+        <div v-if="selecting" class="flex flex-wrap items-center gap-1.5 mt-3 p-2 rounded-lg border border-[#1f1f1f] bg-[#0b0b0b]">
+          <button class="btn btn-sm" @click="togglePickAll">{{ allPicked ? 'Select none' : 'Select all' }}</button>
+          <span class="text-[11px] text-[#666] px-1">{{ pickedTasks.length }} selected</span>
+          <div class="flex-1" />
+          <button
+            class="btn btn-sm btn-accent"
+            :class="{ 'opacity-40 pointer-events-none': !pickedTasks.length || bulkBusy }"
+            @click="bulk('done')"
+          >
+            Mark done ({{ pickedTasks.length }})
+          </button>
+          <button
+            class="btn btn-sm btn-danger"
+            :class="{ 'opacity-40 pointer-events-none': !pickedTasks.length || bulkBusy }"
+            @click="bulk('delete')"
+          >
+            Delete ({{ pickedTasks.length }})
+          </button>
+          <button class="btn btn-sm" @click="stopSelect">Cancel</button>
+        </div>
+
         <p v-if="actionError" class="mt-2 text-xs text-[#ef4444]">{{ actionError }}</p>
+        <p v-else-if="notice" class="mt-2 text-xs text-[#888]">
+          {{ notice.text }}
+          <button class="text-[#818cf8] hover:text-[#a5b4fc] underline underline-offset-2 ml-1" @click="pickDay(notice.day); notice = null">Show</button>
+        </p>
+
+        <!-- How to add tasks -->
+        <p v-if="selected === today && !dayTasks.length" class="mt-3 text-xs text-[#666] leading-relaxed">
+          To add a task: open one of your notes, put the cursor on a line, and click
+          <span class="text-[#a5b4fc]">Today's task</span> in the toolbar.
+        </p>
 
         <ul class="mt-3">
           <li
             v-for="t in dayTasks"
             :key="t.id"
             class="group flex items-start gap-2.5 py-2.5 border-t border-[#141414]"
+            :class="{ 'cursor-pointer': selecting }"
+            @click="selecting && togglePick(t)"
           >
+            <!-- Select box (select mode) or done box -->
+            <span
+              v-if="selecting"
+              class="mt-0.5 w-[18px] h-[18px] shrink-0 rounded border flex items-center justify-center transition-colors"
+              :class="picked.has(t.id) ? 'bg-[#6366f1] border-[#6366f1] text-white' : 'border-[#444]'"
+              role="checkbox"
+              :aria-checked="picked.has(t.id)"
+            >
+              <svg v-if="picked.has(t.id)" width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <button
+              v-else
               class="mt-0.5 w-[18px] h-[18px] shrink-0 rounded border flex items-center justify-center transition-colors"
               :class="t.done ? 'bg-[#22c55e]/15 border-[#22c55e]/60 text-[#22c55e]' : 'border-[#333] hover:border-[#6366f1]'"
               :title="t.done ? 'Mark as not done' : 'Mark as done'"
@@ -298,41 +417,74 @@ function focusInput(el: unknown) {
             </button>
 
             <div class="flex-1 min-w-0">
-              <input
-                v-if="editingId === t.id"
-                :ref="focusInput"
-                v-model="editText"
-                maxlength="500"
-                class="w-full bg-transparent border-b border-[#6366f1] text-sm text-[#f0f0f0] outline-none"
-                @keydown.enter.prevent="saveEdit(t)"
-                @keydown.esc="editingId = null"
-                @blur="saveEdit(t)"
-              />
-              <button
-                v-else
-                class="block w-full text-left text-sm break-words"
-                :class="t.done ? 'line-through text-[#555]' : 'text-[#ddd]'"
-                title="Click to change the text"
-                @click="startEdit(t)"
+              <div
+                class="text-sm break-words"
+                :class="!t.text ? 'italic text-[#555]' : t.done ? 'line-through text-[#555]' : 'text-[#ddd]'"
               >
-                {{ t.text }}
-              </button>
-              <div v-if="isPending(t) || t.movedFrom" class="text-[11px] mt-0.5 flex gap-2">
+                {{ t.text || 'Empty line' }}
+              </div>
+
+              <!-- Small facts about the task -->
+              <div
+                v-if="isPending(t) || t.movedFrom || t.done || t.docId"
+                class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
+              >
                 <span v-if="isPending(t)" class="text-[#ef4444]">Not done</span>
                 <span v-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
+                <span v-if="t.done" class="text-[#22c55e]/80">{{ tookLabel(t) }}</span>
+                <a
+                  v-if="t.docId && !selecting"
+                  :href="noteLink(t)"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-1 text-[#818cf8] hover:text-[#a5b4fc]"
+                  title="Open the note at this line (new tab)"
+                  @click.stop
+                >
+                  Open note
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </a>
+              </div>
+
+              <!-- Move a task that is not done -->
+              <div
+                v-if="!t.done && !selecting"
+                class="flex flex-wrap items-center gap-1.5 mt-1.5"
+                :class="{ 'opacity-50 pointer-events-none': busyId === t.id }"
+              >
+                <button v-if="isPending(t)" class="btn btn-sm btn-accent" @click="moveTo(t, today)">Move to today</button>
+                <button v-else class="btn btn-sm" title="Move to the next day" @click="moveTo(t, addDays(t.day, 1))">Next day</button>
+                <button class="btn btn-sm" title="Move to another day" @click="openDatePick(t)">Pick a date</button>
+              </div>
+              <div v-if="datePickId === t.id && !selecting" class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <input
+                  :ref="focusDateInput"
+                  v-model="pickedDate"
+                  type="date"
+                  :min="today"
+                  class="bg-[#0a0a0a] border border-[#1f1f1f] rounded px-2 py-1 text-xs text-[#f0f0f0] outline-none focus:border-[#6366f1] [color-scheme:dark]"
+                  @keydown.enter.prevent="confirmDatePick(t)"
+                  @keydown.esc="datePickId = null"
+                />
+                <button class="btn btn-sm btn-accent" @click="confirmDatePick(t)">Move</button>
+                <button class="btn btn-sm" @click="datePickId = null">Cancel</button>
               </div>
             </div>
 
-            <button v-if="isPending(t)" class="btn shrink-0" @click="moveToToday(t)">Move to today</button>
             <button
-              class="w-7 h-7 flex items-center justify-center rounded text-[#444] hover:text-[#ef4444] hover:bg-[#1a0808] transition-colors shrink-0 sm:opacity-0 sm:group-hover:opacity-100"
-              title="Delete task"
+              v-if="!selecting"
+              class="w-7 h-7 flex items-center justify-center rounded text-[#444] hover:text-[#ef4444] hover:bg-[#1a0808] transition-colors shrink-0 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
+              :title="t.docId ? 'Remove from the list (the line stays in the note)' : 'Delete task'"
               @click="removeTask(t)"
             >
               <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </li>
         </ul>
+
+        <p v-if="selected === today && dayTasks.length && !selecting" class="mt-3 pt-3 border-t border-[#141414] text-[11px] text-[#444]">
+          Add more from your notes with the <span class="text-[#818cf8]">Today's task</span> button.
+        </p>
       </section>
     </div>
   </div>
