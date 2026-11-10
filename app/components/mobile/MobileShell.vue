@@ -28,6 +28,9 @@ const emit = defineEmits<{
 
 const { loggedIn } = useUserSession()
 
+// Lines can be marked as "Today's task" only in your own private notes.
+const taskMode = computed(() => loggedIn.value && !!props.activeDoc?.isPrivate)
+
 const editorRef = ref<InstanceType<typeof EditorRootComp> | null>(null)
 const setEditorRef = (el: any) => { editorRef.value = el }
 
@@ -134,6 +137,7 @@ function handlePending() {
       <EditorToolbar
         v-if="!viewMode"
         :editor="editorRef?.editor ?? null"
+        :task-mode="taskMode"
       />
 
       <EditorRoot
@@ -142,6 +146,7 @@ function handlePending() {
         :model-value="editorContent"
         :doc-id="activeDoc.id"
         :editable="!viewMode"
+        :task-mode="taskMode"
         @update:model-value="emit('update-content', $event)"
         @update:toc-headings="emit('update-toc', $event)"
         @save-status="emit('update-save-status', $event)"

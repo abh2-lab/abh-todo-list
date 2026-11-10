@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/vue-3'
+import { isOnTaskLine } from '~/lib/taskLines'
 
-const props = defineProps<{ editor: Editor | null }>()
+const props = defineProps<{
+  editor: Editor | null
+  /** Your own private note: show the "Today's task" button. */
+  taskMode?: boolean
+}>()
 
 const imageInput = ref<HTMLInputElement | null>(null)
 const showYoutubeModal = ref(false)
@@ -140,6 +145,19 @@ const buttons = computed<BtnDef[]>(() => {
       <!-- Task list -->
       <button title="Checklist" class="toolbar-btn" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()">
         <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="3" width="3" height="3" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M2 4.5l.8.8 1.6-1.6" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="8.5" width="3" height="3" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 4.5h6M6 10h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+      </button>
+
+      <!-- Today's task: put this line in today's Daily tasks list (click again to take it off) -->
+      <button
+        v-if="taskMode"
+        :title="isOnTaskLine(editor) ? 'Take this line off the Daily tasks list' : 'Today\'s task: add this line to today\'s Daily tasks list'"
+        class="toolbar-btn toolbar-btn-label"
+        :class="{ active: isOnTaskLine(editor) }"
+        :disabled="!editor.can().toggleTodayTask()"
+        @click="editor.chain().focus().toggleTodayTask().run()"
+      >
+        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M4.5 1.25v2.25M9.5 1.25v2.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.8 9l1.4 1.4 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="hidden sm:inline text-xs whitespace-nowrap">Today's task</span>
       </button>
 
       <div class="toolbar-sep" />
@@ -310,6 +328,12 @@ const buttons = computed<BtnDef[]>(() => {
 }
 .toolbar-btn.active {
   @apply text-[#6366f1] bg-[#1a1a2e];
+}
+/* A button with a word next to its icon (the word shows on wider screens). */
+@media (min-width: 640px) {
+  .toolbar-btn.toolbar-btn-label {
+    @apply w-auto px-2 gap-1.5;
+  }
 }
 .toolbar-sep {
   @apply w-px h-4 bg-[#1f1f1f] mx-1;

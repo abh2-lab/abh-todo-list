@@ -8,6 +8,12 @@ const route = useRoute()
 const router = useRouter()
 const { loggedIn } = useUserSession()
 
+// "Open note" in the task list opens /?doc=…&task=… in a new tab: open that note and jump to the line.
+const linkDocId = typeof route.query.doc === 'string' ? route.query.doc : null
+const linkTaskId = typeof route.query.task === 'string' ? route.query.task : null
+const focusTask = useFocusTask()
+if (linkDocId && linkTaskId) focusTask.value = { docId: linkDocId, taskId: linkTaskId }
+
 const {
   docs,
   activeDoc,
@@ -22,7 +28,10 @@ const {
   updateTitle,
   jumpToHeading,
   setShared,
-} = useDocuments()
+} = useDocuments({ initialDocId: linkDocId })
+
+// Lines can be marked as "Today's task" only in your own private notes.
+const taskMode = computed(() => loggedIn.value && !!activeDoc.value?.isPrivate)
 
 // Notes or Daily tasks. Kept in the address (?view=tasks), so a refresh stays on the same part.
 // Daily tasks need a login.
@@ -85,6 +94,10 @@ onMounted(() => {
   if (route.query.login === 'failed') {
     loginFailed.value = true
     router.replace({ query: { ...route.query, login: undefined } })
+  }
+  // The note link was used: take it out of the address, so a refresh does not jump again.
+  if (route.query.doc !== undefined || route.query.task !== undefined) {
+    router.replace({ query: { ...route.query, doc: undefined, task: undefined } })
   }
 })
 
@@ -174,6 +187,7 @@ onBeforeUnmount(() => {
             <EditorToolbar
               v-if="!viewMode"
               :editor="editorRef?.editor ?? null"
+              :task-mode="taskMode"
             />
 
             <EditorRoot
@@ -182,6 +196,7 @@ onBeforeUnmount(() => {
               :model-value="editorContent"
               :doc-id="activeDoc.id"
               :editable="!viewMode"
+              :task-mode="taskMode"
               @update:model-value="onContentUpdate"
               @update:toc-headings="tocHeadings = $event"
               @save-status="saveStatus = $event"

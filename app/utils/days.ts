@@ -31,3 +31,30 @@ export function monthGrid(year: number, month: number): string[] {
   const offset = (new Date(year, month, 1).getDay() + 6) % 7 // Monday = 0
   return Array.from({ length: 42 }, (_, i) => toDayKey(new Date(year, month, 1 - offset + i)))
 }
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** The name of a new private note: "9 Nov 2026, Monday". */
+export function noteDateTitle(d: Date = new Date()): string {
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${WEEKDAYS[d.getDay()]}`
+}
+
+/** A day plus some days: addDays('2026-11-09', 1) = '2026-11-10'. */
+export function addDays(key: string, days: number): string {
+  const d = fromDayKey(key)
+  d.setDate(d.getDate() + days)
+  return toDayKey(d)
+}
+
+/** Whole days from one day to another: daysBetween('2026-11-09', '2026-11-11') = 2. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((fromDayKey(to).getTime() - fromDayKey(from).getTime()) / 86_400_000)
+}
+
+/** A done task took this many days: from its first planned day to the day it was done (1 = same day). */
+export function tookDays(task: { day: string; movedFrom: string | null; doneAt: string | null }): number | null {
+  if (!task.doneAt) return null
+  const start = task.movedFrom ?? task.day
+  return Math.max(1, daysBetween(start, toDayKey(new Date(task.doneAt))) + 1)
+}

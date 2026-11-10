@@ -7,5 +7,7 @@ export interface Task {
   doneAt: string | null
   /** If it was moved: the first day it was planned for. */
   movedFrom: string | null
+  /** The note the task line is in (made with the "Today's task" button). */
+  docId: string | null
   createdAt: string
 }

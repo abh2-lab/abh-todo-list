@@ -2,8 +2,9 @@ import type { TocHeading } from '~/types/editor'
 import type { DocMeta, FullDoc } from '~/types/docs'
 import type EditorRootComp from '~/components/editor/EditorRoot.vue'
 
-export function useDocuments() {
+export function useDocuments(opts: { initialDocId?: string | null } = {}) {
   const { loggedIn } = useUserSession()
+  const { tasksChanged } = usePendingTasks()
   const docs = ref<DocMeta[]>([])
   const activeDoc = ref<FullDoc | null>(null)
   const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
@@ -28,13 +29,15 @@ export function useDocuments() {
     const isOpen = () => activeDoc.value?.id === id
     if (isOpen()) saveStatus.value = 'saving'
     try {
-      await $fetch(`/api/documents/${id}`, {
+      const res = await $fetch<{ tasksChanged?: boolean }>(`/api/documents/${id}`, {
         method: 'PUT',
         body: { content },
       })
       if (isOpen()) saveStatus.value = 'saved'
       const meta = docs.value.find((d) => d.id === id)
       if (meta) meta.updatedAt = new Date().toISOString()
+      // A task line's text changed, or a task line was deleted: the task list changed too.
+      if (res?.tasksChanged) void tasksChanged()
     } catch {
       if (isOpen()) saveStatus.value = 'unsaved'
     }
@@ -52,13 +55,16 @@ export function useDocuments() {
     saveStatus.value = 'saved'
   }
 
-  /** New note. Logged in: private by default. Logged out: always public. */
+  /**
+   * New note. Logged in: private by default, named with today's date ("9 Nov 2026, Monday").
+   * Logged out: always public.
+   */
   async function newDoc(opts: { private?: boolean } = {}) {
     await saveNow()
     const makePrivate = loggedIn.value && (opts.private ?? true)
     const doc = await $fetch<FullDoc>('/api/documents', {
       method: 'POST',
-      body: { private: makePrivate },
+      body: { private: makePrivate, title: makePrivate ? noteDateTitle() : undefined },
     })
     docs.value.unshift(doc)
     await loadDoc(doc.id)
@@ -134,8 +140,20 @@ export function useDocuments() {
   onMounted(async () => {
     document.addEventListener('visibilitychange', onVisibilityChange)
     await loadDocs()
-    if (docs.value.length > 0) {
-      await loadDoc(docs.value[0]!.id)
+    // A link from the task list ("Open note") opens that note, if it is in your list.
+    const linked = opts.initialDocId ? docs.value.find((d) => d.id === opts.initialDocId) : undefined
+    if (linked) {
+      try {
+        await loadDoc(linked.id)
+        return
+      } catch {
+        // Could not load it: open the usual note below.
+      }
+    }
+    // Logged in: start with your newest private note.
+    const first = (loggedIn.value && docs.value.find((d) => d.isPrivate)) || docs.value[0]
+    if (first) {
+      await loadDoc(first.id)
     } else {
       await newDoc()
     }
