@@ -61,6 +61,59 @@ function dotClass(t: Task) {
   return 'bg-[#4a4a4a]'
 }
 
+// ---- Dots in the calendar: as many as fit in a day box, then "+3" for the rest ----
+// A dot is 6px wide with 3px between dots, so each dot takes 9px.
+const DOT_STEP = 9
+const DOT_GAP = 3
+const gridEl = ref<HTMLElement | null>(null)
+// How many dots fit across and down in one day box. All day boxes are the same size.
+const dotRoom = ref({ cols: 8, rows: 1 })
+
+function measureDots() {
+  const box = gridEl.value?.querySelector<HTMLElement>('[data-dots]')
+  if (!box || !box.clientWidth) return // not on screen yet
+  // The exact size (like 58.6px), not the rounded one, so a dot never has to go to a new line.
+  const size = getComputedStyle(box)
+  const cols = Math.max(1, Math.floor((parseFloat(size.width) + DOT_GAP) / DOT_STEP))
+  const rows = Math.max(1, Math.floor((parseFloat(size.height) + DOT_GAP) / DOT_STEP))
+  if (cols !== dotRoom.value.cols || rows !== dotRoom.value.rows) dotRoom.value = { cols, rows }
+}
+
+interface DayDots { dots: Task[]; more: number; moreWidth: number }
+const NO_DOTS: DayDots = { dots: [], more: 0, moreWidth: 0 }
+
+const dotsByDay = computed(() => {
+  const { cols, rows } = dotRoom.value
+  const room = cols * rows
+  const out = new Map<string, DayDots>()
+  for (const [day, list] of byDay.value) {
+    if (list.length <= room) {
+      out.set(day, { dots: list, more: 0, moreWidth: 0 })
+      continue
+    }
+    // "+3" takes the place of the last 2 dots ("+12" needs 3 places, "+123" needs 4).
+    let places = 2
+    if (list.length - (room - places) >= 10) places = 3
+    if (list.length - (room - places) >= 100) places = 4
+    places = Math.min(places, cols)
+    const shown = Math.max(0, room - places)
+    out.set(day, { dots: list.slice(0, shown), more: list.length - shown, moreWidth: places * DOT_STEP - DOT_GAP })
+  }
+  return out
+})
+
+function dotsOf(day: string) {
+  return dotsByDay.value.get(day) ?? NO_DOTS
+}
+
+let dotObserver: ResizeObserver | null = null
+onMounted(() => {
+  measureDots()
+  dotObserver = new ResizeObserver(measureDots)
+  if (gridEl.value) dotObserver.observe(gridEl.value)
+})
+onBeforeUnmount(() => dotObserver?.disconnect())
+
 function tookLabel(t: Task) {
   const n = tookDays(t)
   return n === null ? '' : `took ${n} ${n === 1 ? 'day' : 'days'}`
@@ -293,7 +346,7 @@ watch(selected, () => {
           <button class="btn" @click="goToday">Today</button>
         </div>
 
-        <div class="grid grid-cols-7 gap-1">
+        <div ref="gridEl" class="grid grid-cols-7 gap-1">
           <div v-for="w in weekdays" :key="w" class="text-[11px] text-[#444] text-center pb-1 select-none">{{ w }}</div>
           <button
             v-for="key in grid"
@@ -317,14 +370,19 @@ watch(selected, () => {
             >
               {{ Number(key.slice(8)) }}
             </span>
-            <span class="flex flex-wrap gap-[3px] mt-1.5">
+            <!-- One dot per task. When they do not all fit: "+3" = 3 more tasks -->
+            <span data-dots class="flex-1 min-h-0 w-full overflow-hidden flex flex-wrap content-start gap-[3px] mt-1.5">
               <span
-                v-for="t in (byDay.get(key) ?? []).slice(0, 8)"
+                v-for="t in dotsOf(key).dots"
                 :key="t.id"
-                class="w-1.5 h-1.5 rounded-full"
+                class="w-1.5 h-1.5 shrink-0 rounded-full"
                 :class="dotClass(t)"
               />
-              <span v-if="(byDay.get(key)?.length ?? 0) > 8" class="text-[9px] leading-[6px] text-[#555]">+</span>
+              <span
+                v-if="dotsOf(key).more"
+                class="h-1.5 shrink-0 text-[9px] leading-[6px] font-medium text-[#888] whitespace-nowrap"
+                :style="{ width: `${dotsOf(key).moreWidth}px` }"
+              >+{{ dotsOf(key).more }}</span>
             </span>
           </button>
         </div>
