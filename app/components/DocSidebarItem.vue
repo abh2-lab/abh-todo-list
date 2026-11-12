@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DocMeta } from '~/types/docs'
 
-// One note in the sidebar list.
+// One note in the sidebar list. Long names are cut off with "…": hover a note to see its full name.
 defineProps<{ doc: DocMeta; active: boolean }>()
 const emit = defineEmits<{ select: []; delete: [] }>()
 
@@ -25,6 +25,7 @@ function relativeTime(date: string | Date) {
     tabindex="0"
     class="group relative flex items-center gap-2.5 w-full px-4 py-2.5 cursor-pointer transition-colors"
     :class="active ? 'bg-[#111]' : 'hover:bg-[#0d0d0d]'"
+    :title="doc.title || 'Untitled'"
     @click="emit('select')"
     @keydown.enter="emit('select')"
   >
