@@ -16,6 +16,14 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL,
+    // The login cookie. Without an end date the browser throws it away when it closes,
+    // and people have to log in again. Now the browser keeps it for 90 days, and each
+    // visit starts the 90 days again (server/plugins/keep-login.ts).
+    session: {
+      cookie: {
+        maxAge: 60 * 60 * 24 * 90, // 90 days, in seconds
+      },
+    },
   },
 
   ssr: false,
