@@ -63,12 +63,30 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
   async function newDoc(opts: { private?: boolean } = {}) {
     await saveNow()
     const makePrivate = loggedIn.value && (opts.private ?? true)
-    const doc = await $fetch<FullDoc>('/api/documents', {
-      method: 'POST',
-      body: { private: makePrivate, title: makePrivate ? noteDateTitle() : undefined },
-    })
+    let doc: FullDoc
+    try {
+      doc = await $fetch<FullDoc>('/api/documents', {
+        method: 'POST',
+        body: { private: makePrivate, title: makePrivate ? noteDateTitle() : undefined },
+      })
+    } catch (e) {
+      // 429 = the daily limit of new notes; the server says what to do.
+      showNotice(errorStatus(e) === 429
+        ? errorMessage(e) ?? 'You made too many new notes today. Please try again tomorrow.'
+        : 'Could not make a new note. Check your connection and try again.')
+      return
+    }
     docs.value.unshift(doc)
     await loadDoc(doc.id)
+  }
+
+  // ---- A short message at the top (like "You can make at most 100 new notes a day") ----
+  const notice = ref('')
+  let noticeTimer: ReturnType<typeof setTimeout> | null = null
+  function showNotice(text: string) {
+    notice.value = text
+    if (noticeTimer) clearTimeout(noticeTimer)
+    noticeTimer = setTimeout(() => { notice.value = '' }, 8000)
   }
 
   /** Turn the view-only link of the open private note on or off. */
@@ -162,10 +180,12 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
 
   onBeforeUnmount(() => {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    if (noticeTimer) clearTimeout(noticeTimer)
     void saveNow()
   })
 
   return {
+    notice,
     docs,
     activeDoc,
     saveStatus,

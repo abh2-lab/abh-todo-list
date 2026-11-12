@@ -13,6 +13,7 @@ const focusTask = useFocusTask()
 if (linkDocId && linkTaskId) focusTask.value = { docId: linkDocId, taskId: linkTaskId }
 
 const {
+  notice,
   docs,
   activeDoc,
   saveStatus,
@@ -272,6 +273,16 @@ onBeforeUnmount(() => {
     >
       Google login did not work. Try again.
       <button class="text-[#fca5a5] hover:text-white" title="Close" @click="loginFailed = false">✕</button>
+    </div>
+
+    <!-- A short message, like "You can make at most 100 new notes a day" -->
+    <div
+      v-if="notice"
+      class="fixed top-16 left-1/2 -translate-x-1/2 z-[9995] flex items-center gap-3 w-max max-w-[92vw] px-4 py-2.5 rounded-lg border border-[#ef4444]/40 bg-[#1a0808] text-sm text-[#fca5a5] shadow-2xl"
+      role="alert"
+    >
+      {{ notice }}
+      <button class="shrink-0 text-[#fca5a5] hover:text-white" title="Close" @click="notice = ''">✕</button>
     </div>
   </div>
 </template>
