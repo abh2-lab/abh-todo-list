@@ -10,6 +10,10 @@ export function useDb() {
     const connectionString = (config.databaseUrl as string) || process.env.DATABASE_URL
     if (!connectionString) throw createError({ statusCode: 500, message: 'DATABASE_URL is not configured' })
     const pool = new Pool({ connectionString })
+    // If the database restarts or the network drops, the pool reports an error for each
+    // unused connection. With nobody listening for it, Node stops the whole server.
+    // So we only log it: the pool makes a new connection the next time one is needed.
+    pool.on('error', (err) => console.error('[db] lost a database connection:', err.message))
     _db = drizzle(pool, { schema })
   }
   return _db
