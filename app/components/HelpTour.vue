@@ -50,8 +50,8 @@ function place() {
   const s = { top, left, width: right - left, height: bottom - top }
   spot.value = s
 
-  const w = boxEl.value?.offsetWidth ?? 320
-  const h = boxEl.value?.offsetHeight ?? 170
+  const w = boxEl.value?.offsetWidth ?? 360
+  const h = boxEl.value?.offsetHeight ?? 200
   // Under the part, or above it when there is no room under it.
   let boxTop = s.top + s.height + GAP
   if (boxTop + h > window.innerHeight - EDGE) boxTop = Math.max(EDGE, s.top - GAP - h)
@@ -137,18 +137,18 @@ onBeforeUnmount(() => {
 
       <div
         ref="boxEl"
-        class="tour-box fixed w-[min(320px,calc(100vw-24px))] rounded-xl border border-[#262640] bg-[#0b0b0b] p-4 shadow-2xl shadow-black"
+        class="tour-box fixed w-[min(360px,calc(100vw-24px))] rounded-xl border border-[#262640] bg-[#0b0b0b] p-5 shadow-2xl shadow-black"
         :class="boxPos ? '' : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'"
         :style="boxPos ? { top: `${boxPos.top}px`, left: `${boxPos.left}px` } : undefined"
       >
-        <div class="text-[11px] text-[#666]">{{ index + 1 }} of {{ steps.length }}</div>
-        <h3 id="tour-title" class="mt-1 text-sm font-medium text-[#f0f0f0]">{{ current.title }}</h3>
-        <p id="tour-text" class="mt-1.5 text-xs leading-relaxed text-[#aaa]">{{ current.text }}</p>
-        <div class="mt-4 flex items-center gap-2">
-          <button v-if="!isLast" type="button" class="btn btn-sm btn-ghost -ml-2" @click="close">Skip tour</button>
+        <div class="text-[13px] text-[#666]">{{ index + 1 }} of {{ steps.length }}</div>
+        <h3 id="tour-title" class="mt-1 text-base font-medium text-[#f0f0f0]">{{ current.title }}</h3>
+        <p id="tour-text" class="mt-2 text-sm leading-relaxed text-[#aaa]">{{ current.text }}</p>
+        <div class="mt-5 flex items-center gap-2">
+          <button v-if="!isLast" type="button" class="btn btn-ghost text-[13px] -ml-3" @click="close">Skip tour</button>
           <span class="flex-1" />
-          <button v-if="index > 0" type="button" class="btn btn-sm" @click="back">Back</button>
-          <button ref="nextBtn" type="button" class="btn btn-sm btn-accent" @click="next">
+          <button v-if="index > 0" type="button" class="btn text-[13px]" @click="back">Back</button>
+          <button ref="nextBtn" type="button" class="btn btn-accent text-[13px]" @click="next">
             {{ isLast ? 'Done' : 'Next' }}
           </button>
         </div>
