@@ -1,0 +1,17 @@
+# Files that are not sent into the Docker build.
+
+# Secrets. The server gets them when it starts (docker-compose.yml: env_file),
+# so they are never copied into the image.
+.env
+.env.*
+
+# Installed and built on this computer. The image installs and builds its own.
+node_modules
+.nuxt
+.output
+.data
+
+# Not needed to build or run the app.
+.git
+.claude
+*.log

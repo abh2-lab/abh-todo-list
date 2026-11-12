@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -13,7 +13,7 @@ COPY . .
 RUN npm run build
 
 # ---- Runner ----
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
@@ -29,5 +29,9 @@ EXPOSE 3000
 
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
+
+# Run the app as the normal "node" user, not as root. If someone ever finds a way to run
+# code through the app, they can't change the app's files or the rest of the container.
+USER node
 
 CMD ["/app/docker-entrypoint.sh"]
