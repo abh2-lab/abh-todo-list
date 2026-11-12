@@ -58,3 +58,28 @@ export function tookDays(task: { day: string; movedFrom: string | null; doneAt: 
   const start = task.movedFrom ?? task.day
   return Math.max(1, daysBetween(start, toDayKey(new Date(task.doneAt))) + 1)
 }
+
+// ---- Months, like "2026-09" (share links of Daily tasks) ----
+
+/** The month of a date: "2026-09". */
+export function toMonthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** "2026-09" → "Sep 2026" (or "September 2026" with style 'long'). */
+export function monthName(key: string, style: 'short' | 'long' = 'short'): string {
+  const [y, m] = key.split('-').map(Number)
+  return new Date(y!, m! - 1, 1).toLocaleDateString(undefined, { month: style, year: 'numeric' })
+}
+
+/** "Sep 2026 – Dec 2026", or just "Sep 2026" for one month. */
+export function monthRange(from: string, to: string, style: 'short' | 'long' = 'short'): string {
+  return from === to ? monthName(from, style) : `${monthName(from, style)} – ${monthName(to, style)}`
+}
+
+/** How many months from one month to another, both counted: "2026-09" … "2026-12" = 4. */
+export function monthCount(from: string, to: string): number {
+  const [fy, fm] = from.split('-').map(Number)
+  const [ty, tm] = to.split('-').map(Number)
+  return (ty! - fy!) * 12 + (tm! - fm!) + 1
+}

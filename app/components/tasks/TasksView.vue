@@ -9,16 +9,10 @@ const { tasksVersion, tasksChanged } = usePendingTasks()
 const today = ref(todayKey())
 const selected = ref(today.value)
 const shown = ref({ year: new Date().getFullYear(), month: new Date().getMonth() })
+const shownMonth = computed(() => `${shown.value.year}-${String(shown.value.month + 1).padStart(2, '0')}`)
 
+// The 6 weeks the calendar shows (tasks/Calendar.vue): load the tasks of all of them.
 const grid = computed(() => monthGrid(shown.value.year, shown.value.month))
-const monthPrefix = computed(() => `${shown.value.year}-${String(shown.value.month + 1).padStart(2, '0')}`)
-const monthLabel = computed(() =>
-  new Date(shown.value.year, shown.value.month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-)
-// Mon … Sun (2024-01-01 was a Monday)
-const weekdays = Array.from({ length: 7 }, (_, i) =>
-  new Date(2024, 0, 1 + i).toLocaleDateString(undefined, { weekday: 'short' }),
-)
 
 const tasks = ref<Task[]>([])
 const loading = ref(false)
@@ -37,82 +31,12 @@ const byDay = computed(() => {
 const dayTasks = computed(() => byDay.value.get(selected.value) ?? [])
 const dayDone = computed(() => dayTasks.value.filter((t) => t.done).length)
 
-const monthStats = computed(() => {
-  let done = 0
-  let notDone = 0
-  let toDo = 0
-  for (const t of tasks.value) {
-    if (!t.day.startsWith(monthPrefix.value)) continue
-    if (t.done) done++
-    else if (t.day < today.value) notDone++
-    else toDo++
-  }
-  return { done, notDone, toDo }
-})
+// "Share": a view-only link to the tasks of some months (tasks/ShareDialog.vue).
+const shareOpen = ref(false)
 
 function isPending(t: Task) {
   return !t.done && t.day < today.value
 }
-
-/** green = done, red = not done and the day is over, grey = not done yet */
-function dotClass(t: Task) {
-  if (t.done) return 'bg-[#22c55e]'
-  if (t.day < today.value) return 'bg-[#ef4444]'
-  return 'bg-[#4a4a4a]'
-}
-
-// ---- Dots in the calendar: as many as fit in a day box, then "+3" for the rest ----
-// A dot is 6px wide with 3px between dots, so each dot takes 9px.
-const DOT_STEP = 9
-const DOT_GAP = 3
-const gridEl = ref<HTMLElement | null>(null)
-// How many dots fit across and down in one day box. All day boxes are the same size.
-const dotRoom = ref({ cols: 8, rows: 1 })
-
-function measureDots() {
-  const box = gridEl.value?.querySelector<HTMLElement>('[data-dots]')
-  if (!box || !box.clientWidth) return // not on screen yet
-  // The exact size (like 58.6px), not the rounded one, so a dot never has to go to a new line.
-  const size = getComputedStyle(box)
-  const cols = Math.max(1, Math.floor((parseFloat(size.width) + DOT_GAP) / DOT_STEP))
-  const rows = Math.max(1, Math.floor((parseFloat(size.height) + DOT_GAP) / DOT_STEP))
-  if (cols !== dotRoom.value.cols || rows !== dotRoom.value.rows) dotRoom.value = { cols, rows }
-}
-
-interface DayDots { dots: Task[]; more: number; moreWidth: number }
-const NO_DOTS: DayDots = { dots: [], more: 0, moreWidth: 0 }
-
-const dotsByDay = computed(() => {
-  const { cols, rows } = dotRoom.value
-  const room = cols * rows
-  const out = new Map<string, DayDots>()
-  for (const [day, list] of byDay.value) {
-    if (list.length <= room) {
-      out.set(day, { dots: list, more: 0, moreWidth: 0 })
-      continue
-    }
-    // "+3" takes the place of the last 2 dots ("+12" needs 3 places, "+123" needs 4).
-    let places = 2
-    if (list.length - (room - places) >= 10) places = 3
-    if (list.length - (room - places) >= 100) places = 4
-    places = Math.min(places, cols)
-    const shown = Math.max(0, room - places)
-    out.set(day, { dots: list.slice(0, shown), more: list.length - shown, moreWidth: places * DOT_STEP - DOT_GAP })
-  }
-  return out
-})
-
-function dotsOf(day: string) {
-  return dotsByDay.value.get(day) ?? NO_DOTS
-}
-
-let dotObserver: ResizeObserver | null = null
-onMounted(() => {
-  measureDots()
-  dotObserver = new ResizeObserver(measureDots)
-  if (gridEl.value) dotObserver.observe(gridEl.value)
-})
-onBeforeUnmount(() => dotObserver?.disconnect())
 
 function tookLabel(t: Task) {
   const n = tookDays(t)
@@ -334,72 +258,30 @@ watch(selected, () => {
   <div class="h-full overflow-y-auto bg-black">
     <div class="max-w-6xl mx-auto px-4 py-5 sm:px-6 flex flex-col lg:flex-row gap-6">
       <!-- Calendar -->
-      <section class="lg:flex-[1.4] min-w-0">
-        <div class="flex items-center gap-2 mb-3">
-          <button class="btn px-2" title="Previous month" @click="changeMonth(-1)">
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <TasksCalendar
+        class="lg:flex-[1.4] min-w-0"
+        :year="shown.year"
+        :month="shown.month"
+        :today="today"
+        :selected="selected"
+        :tasks="tasks"
+        :loading="loading"
+        :error="error"
+        today-button
+        @pick="pickDay"
+        @change-month="changeMonth"
+        @today="goToday"
+      >
+        <template #actions>
+          <button class="btn" title="Share your tasks of some months with a view-only link" @click="shareOpen = true">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <path d="M5 7a3 3 0 004.2 0l1.5-1.5a3 3 0 00-4.2-4.2L5.8 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M7 5a3 3 0 00-4.2 0L1.3 6.5a3 3 0 004.2 4.2L6.2 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            Share
           </button>
-          <h2 class="flex-1 text-center text-sm font-medium text-[#e0e0e0] select-none">{{ monthLabel }}</h2>
-          <button class="btn px-2" title="Next month" @click="changeMonth(1)">
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M5.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="btn" @click="goToday">Today</button>
-        </div>
-
-        <div ref="gridEl" class="grid grid-cols-7 gap-1">
-          <div v-for="w in weekdays" :key="w" class="text-[11px] text-[#444] text-center pb-1 select-none">{{ w }}</div>
-          <button
-            v-for="key in grid"
-            :key="key"
-            class="h-14 sm:h-16 rounded-md border p-1.5 flex flex-col items-start text-left transition-colors min-w-0"
-            :class="[
-              key === selected
-                ? 'border-[#6366f1] bg-[#1a1a2e]/60'
-                : key.startsWith(monthPrefix)
-                  ? 'border-[#161616] bg-[#0a0a0a] hover:border-[#333]'
-                  : 'border-transparent hover:border-[#1f1f1f]',
-            ]"
-            :title="longDay(key)"
-            @click="pickDay(key)"
-          >
-            <span
-              class="text-xs leading-none"
-              :class="key === today
-                ? 'text-[#818cf8] font-semibold'
-                : key.startsWith(monthPrefix) ? 'text-[#aaa]' : 'text-[#333]'"
-            >
-              {{ Number(key.slice(8)) }}
-            </span>
-            <!-- One dot per task. When they do not all fit: "+3" = 3 more tasks -->
-            <span data-dots class="flex-1 min-h-0 w-full overflow-hidden flex flex-wrap content-start gap-[3px] mt-1.5">
-              <span
-                v-for="t in dotsOf(key).dots"
-                :key="t.id"
-                class="w-1.5 h-1.5 shrink-0 rounded-full"
-                :class="dotClass(t)"
-              />
-              <span
-                v-if="dotsOf(key).more"
-                class="h-1.5 shrink-0 text-[9px] leading-[6px] font-medium text-[#888] whitespace-nowrap"
-                :style="{ width: `${dotsOf(key).moreWidth}px` }"
-              >+{{ dotsOf(key).more }}</span>
-            </span>
-          </button>
-        </div>
-
-        <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-[#555] select-none">
-          <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />Done</span>
-          <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />Not done (day is over)</span>
-          <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#4a4a4a]" />Not done yet</span>
-        </div>
-        <div class="mt-2 text-xs text-[#555]">
-          This month: <span class="text-[#22c55e]">{{ monthStats.done }} done</span>
-          · <span :class="monthStats.notDone ? 'text-[#ef4444]' : ''">{{ monthStats.notDone }} not done</span>
-          · <span :class="monthStats.toDo ? 'text-[#999]' : ''">{{ monthStats.toDo }} to do</span>
-          <span v-if="loading" class="ml-2 text-[#333]">Loading…</span>
-        </div>
-        <p v-if="error" class="mt-2 text-xs text-[#ef4444]">{{ error }}</p>
-      </section>
+        </template>
+      </TasksCalendar>
 
       <!-- Tasks of the chosen day -->
       <section class="lg:flex-1 min-w-0 w-full self-start rounded-xl border border-[#1f1f1f] bg-[#080808] p-4">
@@ -554,5 +436,7 @@ watch(selected, () => {
         </p>
       </section>
     </div>
+
+    <TasksShareDialog :open="shareOpen" :month="shownMonth" @close="shareOpen = false" />
   </div>
 </template>

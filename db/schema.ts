@@ -47,6 +47,17 @@ export const tasks = pgTable('tasks', {
   index('tasks_doc_id_idx').on(t.docId),
 ])
 
+// Links that show someone's Daily tasks for some months, view only ("Share" in Daily tasks).
+// The id is the secret part of the link. Deleting the row ("Stop sharing") turns the link off.
+export const taskShares = pgTable('task_shares', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // The first and the last month shown, as their first day: 2026-09-01 … 2026-12-01.
+  fromMonth: date('from_month').notNull(),
+  toMonth: date('to_month').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (t) => [index('task_shares_user_id_idx').on(t.userId)])
+
 export type User = typeof users.$inferSelect
 export type Task = typeof tasks.$inferSelect
 export type Document = typeof documents.$inferSelect
