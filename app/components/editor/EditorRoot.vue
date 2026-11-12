@@ -23,6 +23,8 @@ const props = defineProps<{
   editable?: boolean
   /** Your own private note: lines can be marked as "Today's task". */
   taskMode?: boolean
+  /** Goes up when the same note has a newer version (saved somewhere else): show it. */
+  reloadKey?: number
 }>()
 
 const emit = defineEmits<{
@@ -140,19 +142,26 @@ function scrollToPos(pos: number) {
 
 defineExpose({ scrollToPos, editor, scroller })
 
+// false = don't send an "update": nothing in the note changed, so there is nothing to save.
 watch(
   () => props.editable,
-  (val) => editor.value?.setEditable(val !== false),
+  (val) => editor.value?.setEditable(val !== false, false),
 )
 
-// Sync external content changes (document switch)
+// Show new content: another note was opened, or this note has a newer version.
 watch(
-  () => props.docId,
-  () => {
-    if (editor.value) {
-      editor.value.commands.setContent(normalizeContent(props.modelValue), false)
-      buildToc(editor.value)
+  () => [props.docId, props.reloadKey] as const,
+  ([docId], [oldDocId]) => {
+    const e = editor.value
+    if (!e) return
+    // Same note: keep the cursor (or selection) about where it was.
+    const keep = docId === oldDocId ? e.state.selection : null
+    e.commands.setContent(normalizeContent(props.modelValue), false)
+    if (keep) {
+      const end = e.state.doc.content.size
+      e.commands.setTextSelection({ from: Math.min(keep.from, end), to: Math.min(keep.to, end) })
     }
+    buildToc(e)
   },
 )
 

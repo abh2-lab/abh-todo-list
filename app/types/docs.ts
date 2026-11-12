@@ -15,3 +15,25 @@ export interface FullDoc extends DocMeta {
 
 /** The two parts of the app, switched from the header. */
 export type AppView = 'notes' | 'tasks'
+
+/** Someone else who is editing the open note (saved a change in the last 2 minutes). */
+export interface OtherEditor {
+  /** First name of a logged-in person; null = not logged in ("Someone"). */
+  name: string | null
+  /** You, in another tab or on another device. */
+  you: boolean
+}
+
+/**
+ * Why the open note is locked for now:
+ * 'opened' = you opened a note someone else is editing, 'started' = someone started editing
+ * the note you have open (both: we ask first), 'reading' = you chose "Just read".
+ */
+export type EditHold = 'opened' | 'started' | 'reading' | null
+
+/** Someone else saved the note after you got it, and your changes are not saved yet. */
+export interface SaveConflict {
+  docId: string
+  title: string
+  by: OtherEditor | null
+}

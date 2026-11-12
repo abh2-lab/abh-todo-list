@@ -11,6 +11,10 @@ const props = defineProps<{
   editorContent: Record<string, any>
   tocHeadings: TocHeading[]
   pendingCount: number
+  /** Someone else is editing the note: it can't be changed for now. */
+  locked?: boolean
+  /** Goes up when the open note has a newer version to show. */
+  reloadKey?: number
 }>()
 
 const emit = defineEmits<{
@@ -150,7 +154,7 @@ watch(tour.open, (isOpen) => {
       :class="headerHidden ? 'top-0' : 'top-12'"
     >
       <EditorToolbar
-        v-if="!viewMode"
+        v-if="!viewMode && !locked"
         :editor="editorRef?.editor ?? null"
         :task-mode="taskMode"
       />
@@ -160,8 +164,9 @@ watch(tour.open, (isOpen) => {
         :ref="setEditorRef"
         :model-value="editorContent"
         :doc-id="activeDoc.id"
-        :editable="!viewMode"
+        :editable="!viewMode && !locked"
         :task-mode="taskMode"
+        :reload-key="reloadKey"
         @update:model-value="emit('update-content', $event)"
         @update:toc-headings="emit('update-toc', $event)"
         @save-status="emit('update-save-status', $event)"

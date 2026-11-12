@@ -1,8 +1,30 @@
 import type { TocHeading } from '~/types/editor'
-import type { DocMeta, FullDoc } from '~/types/docs'
+import type { DocMeta, EditHold, FullDoc, OtherEditor, SaveConflict } from '~/types/docs'
 import type EditorRootComp from '~/components/editor/EditorRoot.vue'
 
-export function useDocuments(opts: { initialDocId?: string | null } = {}) {
+// While a note is open, ask the server this often who else is editing it.
+const CHECK_EDITORS_MS = 10_000
+
+interface SaveJob {
+  id: string
+  content: Record<string, any>
+}
+
+/** A random id for this tab. (randomUUID needs https or localhost; getRandomValues does not.) */
+function newTabId() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** Is time a later than time b? Both like "2026-11-12T10:06:00.123Z". */
+function isNewer(a: string | undefined, b: string | undefined) {
+  return !!a && (!b || Date.parse(a) > Date.parse(b))
+}
+
+export function useDocuments(opts: {
+  initialDocId?: string | null
+  /** false while the notes are hidden (Daily tasks is open): then we don't check who is editing. */
+  active?: () => boolean
+} = {}) {
   const { loggedIn } = useUserSession()
   const { tasksChanged } = usePendingTasks()
   const docs = ref<DocMeta[]>([])
@@ -11,37 +33,123 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
   const editorContent = ref<Record<string, any>>({})
   const tocHeadings = ref<TocHeading[]>([])
   const editorRef = ref<InstanceType<typeof EditorRootComp> | null>(null)
+  // Goes up when the open note gets a newer version from the server, so the editor shows it.
+  const reloadKey = ref(0)
 
+  // ---- Two people, one note ----
+  // Every tab has its own id, so the server can tell editors apart (even you in two tabs).
+  const tab = newTabId()
+  // Others who are editing the open note now (they saved a change in the last 2 minutes).
+  const editors = ref<OtherEditor[]>([])
+  // Why the open note is locked for now (see EditHold). null = you can edit.
+  const hold = ref<EditHold>(null)
+  // Someone else saved a note after we got it, and our changes are not saved: we ask what to do.
+  const conflict = ref<SaveConflict | null>(null)
+  let conflictJob: SaveJob | null = null
+  // The newest version (updatedAt) we know of each note. It goes with every save,
+  // so the server can tell us when someone else saved in between.
+  const versions = new Map<string, string>()
+
+  /** The open note can't be changed now: we are asking first, or the person is only reading. */
+  const locked = computed(() =>
+    !!activeDoc.value && (hold.value !== null || conflict.value?.docId === activeDoc.value.id))
+
+  // ---- Saving ----
   // Auto-save runs 1s after the last change. We keep the note id together
   // with the content, so a save that runs after the user switched notes
   // still goes to the note that was edited (not the one open now).
   let saveTimer: ReturnType<typeof setTimeout> | null = null
-  let pendingSave: { id: string; content: Record<string, any> } | null = null
+  let pendingSave: SaveJob | null = null
+  // Saves go one after the other: they reach the server in order,
+  // and each one knows the version the one before it made.
+  let saveQueue: Promise<void> = Promise.resolve()
+  let savingId: string | null = null
 
-  async function saveNow() {
+  function queue(work: () => Promise<void>): Promise<void> {
+    const run = saveQueue.then(work)
+    saveQueue = run.catch(() => {})
+    return saveQueue
+  }
+
+  function scheduleSave(ms: number) {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => void saveNow(), ms)
+  }
+
+  /** Save the waiting changes now. Resolves when every save so far is done. */
+  function saveNow(): Promise<void> {
     if (saveTimer) {
       clearTimeout(saveTimer)
       saveTimer = null
     }
-    if (!pendingSave) return
-    const { id, content } = pendingSave
+    const job = pendingSave
     pendingSave = null
+    return job ? queue(() => sendSave(job, false)) : saveQueue
+  }
+
+  async function sendSave(job: SaveJob, force: boolean) {
+    const { id, content } = job
+    // We are asking the person what to do about someone else's changes: keep these for the answer.
+    if (!force && conflictJob?.id === id) {
+      conflictJob = job
+      return
+    }
     const isOpen = () => activeDoc.value?.id === id
     if (isOpen()) saveStatus.value = 'saving'
+    savingId = id
     try {
-      const res = await $fetch<{ tasksChanged?: boolean }>(`/api/documents/${id}`, {
+      const res = await $fetch<{ updatedAt: string; tasksChanged?: boolean }>(`/api/documents/${id}`, {
         method: 'PUT',
-        body: { content },
+        body: { content, tab, base: versions.get(id), force: force || undefined },
       })
-      if (isOpen()) saveStatus.value = 'saved'
-      const meta = docs.value.find((d) => d.id === id)
-      if (meta) meta.updatedAt = new Date().toISOString()
+      gotVersion(id, res.updatedAt)
+      if (isOpen() && pendingSave?.id !== id) saveStatus.value = 'saved'
       // A task line's text changed, or a task line was deleted: the task list changed too.
-      if (res?.tasksChanged) void tasksChanged()
-    } catch {
+      if (res.tasksChanged) void tasksChanged()
+    } catch (e) {
+      const status = errorStatus(e)
+      if (status === 409) {
+        // Someone else saved this note after we got it. Keep our newest changes and ask what to do.
+        conflictJob = pendingSave?.id === id ? pendingSave : job
+        if (pendingSave?.id === id) pendingSave = null
+        conflict.value = { docId: id, title: titleOf(id), by: errorData<{ by?: OtherEditor | null }>(e)?.by ?? null }
+      } else if (!status || status >= 500) {
+        // No connection, or a problem on the server: try again soon (newer changes win).
+        if (!pendingSave) {
+          pendingSave = job
+          scheduleSave(5000)
+        }
+      } else if (status === 404) {
+        showNotice('This note could not be saved. Someone may have deleted it.')
+      } else if (status === 413) {
+        showNotice('This note is too big to save (50 MB at most). Remove some pictures and try again.')
+      } else {
+        showNotice('Could not save this note. Try again.')
+      }
       if (isOpen()) saveStatus.value = 'unsaved'
+    } finally {
+      savingId = null
     }
   }
+
+  /** The server has this version of the note now. */
+  function gotVersion(id: string, updatedAt: string) {
+    versions.set(id, updatedAt)
+    if (activeDoc.value?.id === id) activeDoc.value.updatedAt = updatedAt
+    const meta = docs.value.find((d) => d.id === id)
+    if (meta) meta.updatedAt = updatedAt
+  }
+
+  function titleOf(id: string) {
+    return docs.value.find((d) => d.id === id)?.title ?? activeDoc.value?.title ?? 'Untitled'
+  }
+
+  /** Something here is not saved yet (then we must not replace it with the server's version). */
+  function hasUnsaved(id: string) {
+    return pendingSave?.id === id || savingId === id || conflictJob?.id === id
+  }
+
+  // ---- Opening notes ----
 
   async function loadDocs() {
     docs.value = await $fetch<DocMeta[]>('/api/documents')
@@ -49,10 +157,115 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
 
   async function loadDoc(id: string) {
     await saveNow() // finish saving the open note before switching
-    const doc = await $fetch<FullDoc>(`/api/documents/${id}`)
+    const [doc, now] = await Promise.all([
+      $fetch<FullDoc>(`/api/documents/${id}`),
+      fetchEditors(id),
+    ])
+    const left = activeDoc.value?.id
+    if (left && left !== id) leaveNote(left)
     activeDoc.value = doc
+    versions.set(id, doc.updatedAt)
     editorContent.value = (doc.content as Record<string, any>) ?? {}
     saveStatus.value = 'saved'
+    // Someone else is editing this note: ask first. The note stays locked until the person chooses.
+    editors.value = now?.editors ?? []
+    hold.value = editors.value.length ? 'opened' : null
+  }
+
+  /** Show the newest version of the open note (saved by someone else, or by you in another tab). */
+  async function showNewest(id: string) {
+    if (hasUnsaved(id)) return
+    let doc: FullDoc
+    try {
+      doc = await $fetch<FullDoc>(`/api/documents/${id}`)
+    } catch {
+      return
+    }
+    // Typed something meanwhile, or opened another note: keep that.
+    if (activeDoc.value?.id !== id || hasUnsaved(id)) return
+    gotVersion(id, doc.updatedAt)
+    activeDoc.value.title = doc.title
+    const meta = docs.value.find((d) => d.id === id)
+    if (meta) meta.title = doc.title
+    editorContent.value = (doc.content as Record<string, any>) ?? {}
+    reloadKey.value++
+  }
+
+  // ---- Who else is editing ----
+
+  async function fetchEditors(id: string) {
+    try {
+      return await $fetch<{ editors: OtherEditor[]; updatedAt: string }>(
+        `/api/documents/${id}/editors`,
+        { query: { tab } },
+      )
+    } catch {
+      return null
+    }
+  }
+
+  /** Tell the server this tab is not editing the note any more. */
+  function leaveNote(id: string) {
+    // keepalive: it still goes out when the tab is being closed.
+    void fetch(`/api/documents/${encodeURIComponent(id)}/editors?tab=${tab}`, { method: 'DELETE', keepalive: true })
+      .catch(() => {})
+  }
+
+  let checking = false
+  async function checkEditors() {
+    const id = activeDoc.value?.id
+    if (!id || checking || document.visibilityState !== 'visible') return
+    if (opts.active && !opts.active()) return
+    checking = true
+    try {
+      const now = await fetchEditors(id)
+      if (!now || activeDoc.value?.id !== id) return
+      const hadNone = editors.value.length === 0
+      editors.value = now.editors
+      // Someone started editing the note you have open: tell you once, and ask.
+      if (now.editors.length && hadNone && hold.value === null) hold.value = 'started'
+      // It was saved somewhere else: show the newest version (if nothing here waits to be saved).
+      if (isNewer(now.updatedAt, versions.get(id))) await showNewest(id)
+    } finally {
+      checking = false
+    }
+  }
+
+  /** "Edit anyway" / "Keep editing" */
+  function editAnyway() {
+    hold.value = null
+  }
+
+  /** "Just read": the note stays locked and shows the newest version as others save it. */
+  function justRead() {
+    hold.value = 'reading'
+    const id = activeDoc.value?.id
+    if (!id) return
+    // Changes typed before this still get saved. After that, this tab is not an editor any more.
+    void saveNow().then(() => {
+      if (activeDoc.value?.id === id && hold.value === 'reading') leaveNote(id)
+    })
+  }
+
+  /** "Save mine": my version replaces the one someone else saved. */
+  function keepMine() {
+    const job = conflictJob
+    conflict.value = null
+    conflictJob = null
+    if (job) void queue(() => sendSave(job, true))
+  }
+
+  /** "Use theirs": forget my changes that are not saved, and show the newest version. */
+  async function takeTheirs() {
+    const c = conflict.value
+    conflict.value = null
+    conflictJob = null
+    if (!c) return
+    if (pendingSave?.id === c.docId) pendingSave = null
+    if (activeDoc.value?.id === c.docId) {
+      await showNewest(c.docId)
+      saveStatus.value = 'saved'
+    }
   }
 
   /**
@@ -117,11 +330,17 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
         saveTimer = null
       }
     }
+    if (conflict.value?.docId === id) {
+      conflict.value = null
+      conflictJob = null
+    }
     await $fetch(`/api/documents/${id}`, { method: 'DELETE' })
     docs.value = docs.value.filter((d) => d.id !== id)
     if (activeDoc.value?.id === id) {
       activeDoc.value = null
       editorContent.value = {}
+      editors.value = []
+      hold.value = null
       if (docs.value.length > 0) await loadDoc(docs.value[0]!.id)
     }
   }
@@ -129,21 +348,37 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
   function onContentUpdate(content: Record<string, any>) {
     editorContent.value = content
     if (!activeDoc.value) return
+    // Locked (we are asking first, or the person is only reading): this tab does not save the note.
+    if (locked.value) return
     // Changes of another note still waiting? Save them first.
     if (pendingSave && pendingSave.id !== activeDoc.value.id) void saveNow()
     pendingSave = { id: activeDoc.value.id, content }
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(saveNow, 1000)
+    scheduleSave(1000)
+  }
+
+  /** The editor says there are changes ("Unsaved", then "Saving…"). Not while locked: then nothing is saved. */
+  function onEditorSaveStatus(status: 'saved' | 'saving' | 'unsaved') {
+    if (!locked.value) saveStatus.value = status
   }
 
   async function updateTitle(title: string) {
     if (!activeDoc.value) return
+    const id = activeDoc.value.id
     activeDoc.value.title = title
-    const idx = docs.value.findIndex((d) => d.id === activeDoc.value!.id)
+    const idx = docs.value.findIndex((d) => d.id === id)
     if (idx >= 0) docs.value[idx]!.title = title
-    await $fetch(`/api/documents/${activeDoc.value.id}`, {
-      method: 'PUT',
-      body: { title },
+    // In the same line as the saves, so a save never takes this new version for someone else's.
+    await saveNow()
+    await queue(async () => {
+      try {
+        const res = await $fetch<{ updatedAt: string }>(`/api/documents/${id}`, {
+          method: 'PUT',
+          body: { title, tab },
+        })
+        gotVersion(id, res.updatedAt)
+      } catch {
+        showNotice('Could not save the new name. Try again.')
+      }
     })
   }
 
@@ -152,12 +387,28 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
   }
 
   // Save right away when the page is hidden (other tab, other app, closing).
+  // Back to the page: see who is editing now.
   function onVisibilityChange() {
     if (document.visibilityState === 'hidden') void saveNow()
+    else void checkEditors()
   }
+
+  // The tab is being closed: this tab is not editing any more.
+  function onPageHide() {
+    if (activeDoc.value) leaveNote(activeDoc.value.id)
+  }
+
+  // Back to the notes (from Daily tasks): see who is editing now.
+  if (opts.active) {
+    watch(opts.active, (on) => { if (on) void checkEditors() })
+  }
+
+  let editorsTimer: ReturnType<typeof setInterval> | null = null
 
   onMounted(async () => {
     document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', onPageHide)
+    editorsTimer = setInterval(() => void checkEditors(), CHECK_EDITORS_MS)
     await loadDocs()
     // A link from the task list ("Open note") opens that note, if it is in your list.
     const linked = opts.initialDocId ? docs.value.find((d) => d.id === opts.initialDocId) : undefined
@@ -180,8 +431,11 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
 
   onBeforeUnmount(() => {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('pagehide', onPageHide)
+    if (editorsTimer) clearInterval(editorsTimer)
     if (noticeTimer) clearTimeout(noticeTimer)
     void saveNow()
+    if (activeDoc.value) leaveNote(activeDoc.value.id)
   })
 
   return {
@@ -192,6 +446,11 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
     editorContent,
     tocHeadings,
     editorRef,
+    reloadKey,
+    editors,
+    hold,
+    conflict,
+    locked,
     loadDoc,
     newDoc,
     deleteDoc,
@@ -199,5 +458,10 @@ export function useDocuments(opts: { initialDocId?: string | null } = {}) {
     updateTitle,
     jumpToHeading,
     setShared,
+    editAnyway,
+    justRead,
+    keepMine,
+    takeTheirs,
+    onEditorSaveStatus,
   }
 }

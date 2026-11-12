@@ -12,6 +12,15 @@ const linkTaskId = typeof route.query.task === 'string' ? route.query.task : nul
 const focusTask = useFocusTask()
 if (linkDocId && linkTaskId) focusTask.value = { docId: linkDocId, taskId: linkTaskId }
 
+// Notes or Daily tasks. Kept in the address (?view=tasks), so a refresh stays on the same part.
+// Daily tasks need a login.
+const view = computed<AppView>({
+  get: () => (loggedIn.value && route.query.view === 'tasks' ? 'tasks' : 'notes'),
+  set: (v) => {
+    router.replace({ query: { ...route.query, view: v === 'tasks' ? 'tasks' : undefined } })
+  },
+})
+
 const {
   notice,
   docs,
@@ -27,19 +36,20 @@ const {
   updateTitle,
   jumpToHeading,
   setShared,
-} = useDocuments({ initialDocId: linkDocId })
+  reloadKey,
+  editors,
+  hold,
+  conflict,
+  locked,
+  editAnyway,
+  justRead,
+  keepMine,
+  takeTheirs,
+  onEditorSaveStatus,
+} = useDocuments({ initialDocId: linkDocId, active: () => view.value === 'notes' })
 
 // Lines can be marked as "Today's task" only in your own private notes.
 const taskMode = computed(() => loggedIn.value && !!activeDoc.value?.isPrivate)
-
-// Notes or Daily tasks. Kept in the address (?view=tasks), so a refresh stays on the same part.
-// Daily tasks need a login.
-const view = computed<AppView>({
-  get: () => (loggedIn.value && route.query.view === 'tasks' ? 'tasks' : 'notes'),
-  set: (v) => {
-    router.replace({ query: { ...route.query, view: v === 'tasks' ? 'tasks' : undefined } })
-  },
-})
 
 // Tab title: "Rohit - 10 Nov 2026, Tuesday", or "Rohit - Daily tasks".
 usePageTitle(() => {
@@ -163,13 +173,15 @@ onBeforeUnmount(() => {
       :editor-content="editorContent"
       :toc-headings="tocHeadings"
       :pending-count="pendingCount"
+      :locked="locked"
+      :reload-key="reloadKey"
       @select-doc="openDoc"
       @delete-doc="deleteDoc"
       @new-doc="makeDoc"
       @update-title="updateTitle"
       @update-content="onContentUpdate"
       @update-toc="tocHeadings = $event"
-      @update-save-status="saveStatus = $event"
+      @update-save-status="onEditorSaveStatus"
       @set-shared="setShared"
       @update:view="view = $event"
       @open-pending="pendingOpen = true"
@@ -229,7 +241,7 @@ onBeforeUnmount(() => {
           <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
             <!-- Toolbar — plain v-if avoids Transition + multi-root warning -->
             <EditorToolbar
-              v-if="!viewMode"
+              v-if="!viewMode && !locked"
               :editor="editorRef?.editor ?? null"
               :task-mode="taskMode"
             />
@@ -239,11 +251,12 @@ onBeforeUnmount(() => {
               ref="editorRef"
               :model-value="editorContent"
               :doc-id="activeDoc.id"
-              :editable="!viewMode"
+              :editable="!viewMode && !locked"
               :task-mode="taskMode"
+              :reload-key="reloadKey"
               @update:model-value="onContentUpdate"
               @update:toc-headings="tocHeadings = $event"
-              @save-status="saveStatus = $event"
+              @save-status="onEditorSaveStatus"
             />
 
             <div v-else class="flex-1 flex items-center justify-center text-[#2a2a2a] text-sm select-none">
@@ -262,6 +275,18 @@ onBeforeUnmount(() => {
 
     <!-- Pending tasks popup (both phone and desktop) -->
     <TasksPendingPopup :open="pendingOpen" @close="pendingOpen = false" />
+
+    <!-- Two people editing the same note: ask first, and never write over someone's changes unasked -->
+    <NoteEditWarning
+      v-if="view === 'notes'"
+      :hold="hold"
+      :editors="editors"
+      :conflict="conflict"
+      @edit-anyway="editAnyway"
+      @just-read="justRead"
+      @keep-mine="keepMine"
+      @take-theirs="takeTheirs"
+    />
 
     <!-- Help tour (both phone and desktop) -->
     <HelpTour />
