@@ -11,10 +11,11 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import Link from '@tiptap/extension-link'
 import ResizableMedia from './ResizableMedia.vue'
 import type { TocHeading } from '~/types/editor'
 import { TaskLines } from '~/lib/taskLines'
+import { SafeLink } from '~/lib/safeLink'
+import { LINK_REL, cleanNoteContent } from '#shared/noteContent'
 
 const props = defineProps<{
   modelValue: Record<string, any>
@@ -46,9 +47,10 @@ const ResizableImage = Image.extend({
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+// A note can come from anyone (public notes): show only a cleaned copy (shared/noteContent.ts).
+// Not a note yet (a new, empty one): start with an empty page.
 function normalizeContent(c: Record<string, any> | null | undefined) {
-  if (!c || typeof c !== 'object' || !(c as any).type) return ''
-  return JSON.parse(JSON.stringify(c))
+  return cleanNoteContent(c) ?? ''
 }
 
 const editor = useEditor({
@@ -68,13 +70,13 @@ const editor = useEditor({
     TableRow,
     TableHeader,
     TableCell,
-    Link.configure({
-      openOnClick: true,
+    SafeLink.configure({
+      openOnClick: false, // SafeLink opens links itself, safely
       autolink: true,
       linkOnPaste: true,
       HTMLAttributes: {
         target: '_blank',
-        rel: 'noopener noreferrer nofollow',
+        rel: LINK_REL,
         class: 'editor-link',
       },
     }),

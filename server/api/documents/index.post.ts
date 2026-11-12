@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { useDb } from '../../db'
 import { documents } from '../../../db/schema'
+import { cleanNoteContent } from '#shared/noteContent'
 
 export default defineEventHandler(async (event) => {
   const body = (await readBody(event).catch(() => ({}))) ?? {}
@@ -17,13 +18,21 @@ export default defineEventHandler(async (event) => {
   // You already have a note with that name: call the new one "9 Nov 2026, Monday_2" (then _3, …).
   if (userId) title = await freeNoteTitle(userId, title)
 
+  // Anyone can send anything here, so keep only a cleaned copy of the note (shared/noteContent.ts).
+  let content: object = {}
+  if (body.content != null) {
+    const cleaned = cleanNoteContent(body.content)
+    if (!cleaned) throw createError({ statusCode: 400, message: 'content must be a note' })
+    content = cleaned
+  }
+
   const db = useDb()
   const [doc] = await db
     .insert(documents)
     .values({
       id: randomUUID(),
       title,
-      content: body.content ?? {},
+      content,
       userId,
     })
     .returning()

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Editor } from '@tiptap/vue-3'
 import { isOnTaskLine } from '~/lib/taskLines'
+import { youtubeSrc } from '#shared/noteContent'
 
 const props = defineProps<{
   editor: Editor | null
@@ -27,7 +28,9 @@ function insertImage(e: Event) {
 
 function insertYoutube() {
   if (!props.editor || !youtubeUrl.value.trim()) return
-  props.editor.chain().focus().setYoutubeVideo({ src: youtubeUrl.value.trim() }).run()
+  // With "https://" in front: without it the editor library fails to show the video.
+  const src = youtubeSrc(youtubeUrl.value)
+  if (src) props.editor.chain().focus().setYoutubeVideo({ src }).run()
   youtubeUrl.value = ''
   showYoutubeModal.value = false
 }

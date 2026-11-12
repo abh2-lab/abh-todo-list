@@ -1,6 +1,7 @@
 import { useDb } from '../../../db'
 import { documents, type NewDocument } from '../../../../db/schema'
 import { and, eq, type SQL } from 'drizzle-orm'
+import { cleanNoteContent } from '#shared/noteContent'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
@@ -9,8 +10,13 @@ export default defineEventHandler(async (event) => {
   const db = useDb()
 
   const changes: Partial<NewDocument> = {}
-  if (body.title !== undefined) changes.title = String(body.title)
-  if (body.content !== undefined) changes.content = body.content
+  if (body.title !== undefined) changes.title = String(body.title).slice(0, 200)
+  if (body.content !== undefined) {
+    // Anyone can send anything here (public notes), so keep only a cleaned copy (shared/noteContent.ts).
+    const cleaned = cleanNoteContent(body.content)
+    if (!cleaned) throw createError({ statusCode: 400, message: 'content must be a note' })
+    changes.content = cleaned
+  }
   if (changes.title !== undefined || changes.content !== undefined) changes.updatedAt = new Date()
 
   // Public notes and your own private notes can be changed...
