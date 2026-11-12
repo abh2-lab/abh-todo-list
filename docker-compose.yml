@@ -1,8 +1,14 @@
 services:
   app:
     build: .
-    ports:
-      - "3000:3000"
+    # There is no "ports:" here on purpose. Coolify's proxy reaches the app inside Docker
+    # and serves it on your domain with HTTPS. Publishing port 3000 would also open
+    # http://<server-ip>:3000 to the whole internet, without HTTPS.
+    # To try this file on your own computer, add this (it opens the port only to you):
+    #   ports:
+    #     - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
     env_file:
       - .env
     environment:
