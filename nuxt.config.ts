@@ -28,6 +28,23 @@ export default defineNuxtConfig({
 
   ssr: false,
 
+  // Safety headers on every answer from the server:
+  // - other sites can't show this app inside a frame (a trick to make people click
+  //   things, like "Delete", without knowing)
+  // - the browser doesn't guess file types, and doesn't send full page addresses to other sites
+  // - no plugins (like Flash), and no camera, microphone or location
+  routeRules: {
+    '/**': {
+      headers: {
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Content-Security-Policy': "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+      },
+    },
+  },
+
   // App logo (public/favicon.svg) in the browser tab, plus copies for older browsers and phones
   app: {
     head: {
