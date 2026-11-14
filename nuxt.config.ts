@@ -1,8 +1,4 @@
 export default defineNuxtConfig({
-  future: {
-    compatibilityVersion: 4,
-  },
-
   compatibilityDate: '2025-01-01',
 
   modules: ['@nuxtjs/tailwindcss', 'nuxt-auth-utils'],
@@ -13,6 +9,14 @@ export default defineNuxtConfig({
   },
 
   css: ['~/assets/main.css'],
+
+  // The Tailwind module adds Tailwind's "nesting" helper, which Nuxt 4 can't load from
+  // Tailwind 3 (it only warns). Our CSS has no nested rules, so it is simply turned off.
+  postcss: {
+    plugins: {
+      'tailwindcss/nesting': false,
+    },
+  },
 
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL,
