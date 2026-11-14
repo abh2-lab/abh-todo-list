@@ -80,7 +80,7 @@ export default defineEventHandler(async (event) => {
       tasksChanged = (await syncNoteTasks(db, { docId: doc.id, userId: user.id, content: changes.content })) > 0
     } catch (e) {
       // The note itself is saved; the list catches up on the next save.
-      console.error('[tasks] could not update the task lines of a note', e)
+      console.error('[tasks] could not update the task lines of a note', hideQueryValues(e))
     }
   }
   return { ...toClientDoc(doc), tasksChanged }
