@@ -1,16 +1,12 @@
 <script setup lang="ts">
 import { useEditor, EditorContent, VueNodeViewRenderer } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
+import { TaskList, TaskItem } from '@tiptap/extension-list'
 import Image from '@tiptap/extension-image'
 import Youtube from '@tiptap/extension-youtube'
 import Typography from '@tiptap/extension-typography'
-import Placeholder from '@tiptap/extension-placeholder'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableHeader from '@tiptap/extension-table-header'
-import TableCell from '@tiptap/extension-table-cell'
+import { Placeholder } from '@tiptap/extensions'
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import ResizableMedia from './ResizableMedia.vue'
 import type { TocHeading } from '~/types/editor'
 import { TaskLines } from '~/lib/taskLines'
@@ -61,6 +57,13 @@ const editor = useEditor({
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
+      // Version 3 of the editor added these to StarterKit. They are off, so the editor works as before:
+      link: false, // we have our own safe links (SafeLink, below)
+      underline: false, // there is no underline in our notes
+      // It would add an empty line at the end of some notes when you just click in them.
+      // That is a save, and other people with the note open would get the "someone else saved" warning.
+      trailingNode: false,
+      listKeymap: false, // Backspace and Delete in lists work as before
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
@@ -156,7 +159,8 @@ watch(
     if (!e) return
     // Same note: keep the cursor (or selection) about where it was.
     const keep = docId === oldDocId ? e.state.selection : null
-    e.commands.setContent(normalizeContent(props.modelValue), false)
+    // No "update": this is the saved note itself, so there is nothing new to save.
+    e.commands.setContent(normalizeContent(props.modelValue), { emitUpdate: false })
     if (keep) {
       const end = e.state.doc.content.size
       e.commands.setTextSelection({ from: Math.min(keep.from, end), to: Math.min(keep.to, end) })

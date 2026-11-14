@@ -45,6 +45,10 @@ declare module '@tiptap/core' {
       toggleTodayTask: () => ReturnType
     }
   }
+  /** editor.storage.taskLines */
+  interface Storage {
+    taskLines: TaskLinesStorage
+  }
 }
 
 export const taskLinesKey = new PluginKey<DecorationSet>('taskLines')
