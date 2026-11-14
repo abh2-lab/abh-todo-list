@@ -2,6 +2,7 @@ import { useDb } from '../../../db'
 import { documents, type NewDocument } from '../../../../db/schema'
 import { and, eq, sql, type SQL } from 'drizzle-orm'
 import { cleanNoteContent } from '#shared/noteContent'
+import { withoutNul } from '#shared/text'
 
 export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')!
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const db = useDb()
 
   const changes: Partial<NewDocument> = {}
-  if (body.title !== undefined) changes.title = String(body.title).slice(0, 200)
+  if (body.title !== undefined) changes.title = withoutNul(String(body.title)).slice(0, 200)
   if (body.content !== undefined) {
     // Anyone can send anything here (public notes), so keep only a cleaned copy (shared/noteContent.ts).
     const cleaned = cleanNoteContent(body.content)

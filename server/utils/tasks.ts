@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { tasks } from '../../db/schema'
 import type { useDb } from '../db'
+import { withoutNul } from '#shared/text'
 
 /** The task fields we send to the browser. */
 export const taskColumns = {
@@ -29,7 +30,7 @@ export function readDay(value: unknown, name = 'day'): string {
 }
 
 export function readTaskText(value: unknown): string {
-  const text = String(value ?? '').trim()
+  const text = withoutNul(String(value ?? '')).trim()
   if (!text) throw createError({ statusCode: 400, message: 'Write the task first' })
   if (text.length > 500) throw createError({ statusCode: 400, message: 'Task is too long (500 letters max)' })
   return text

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { useDb } from '../../db'
 import { documents } from '../../../db/schema'
 import { cleanNoteContent } from '#shared/noteContent'
+import { withoutNul } from '#shared/text'
 
 // Each person (account, or internet address when not logged in) can make this many new notes a day.
 const MAX_NEW_NOTES_A_DAY = 100
@@ -33,7 +34,8 @@ export default defineEventHandler(async (event) => {
   )
 
   // The browser sends today's date as the name of a new private note, like "9 Nov 2026, Monday".
-  let title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : 'Untitled'
+  const asked = typeof body.title === 'string' ? withoutNul(body.title).trim() : ''
+  let title = asked ? asked.slice(0, 200) : 'Untitled'
   // You already have a note with that name: call the new one "9 Nov 2026, Monday_2" (then _3, …).
   if (userId) title = await freeNoteTitle(userId, title)
 

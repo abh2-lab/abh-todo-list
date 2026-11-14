@@ -6,7 +6,11 @@
 //   class saved in a note are not used (a saved class could cover the whole page)
 // - sizes, table column widths and code languages keep only plain values
 // - settings (attrs) keep only plain values, and keys like "__proto__" are dropped
+// - the invisible "null" character is taken out of all text (shared/text.ts): a task
+//   line with it could not be saved to the Daily tasks list
 // Everything else stays as it is.
+
+import { withoutNul } from './text'
 
 export interface NoteMark {
   type: string
@@ -87,7 +91,8 @@ export function isSafeYoutubeSrc(src: unknown): src is string {
 
 /** A plain setting value (text, number, yes/no, empty), or undefined to drop it. */
 function plainValue(value: unknown): string | number | boolean | null | undefined {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'string') return withoutNul(value)
+  if (value === null || typeof value === 'boolean') return value
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
   return undefined
 }
@@ -153,8 +158,9 @@ function cleanNode(node: unknown, depth: number): NoteNode | null {
   const out: NoteNode = { type: node.type }
   if (node.attrs !== undefined) out.attrs = cleanAttrs(node.type, node.attrs)
   if (node.type === 'text') {
-    if (typeof node.text !== 'string' || node.text === '') return null
-    out.text = node.text
+    const text = typeof node.text === 'string' ? withoutNul(node.text) : ''
+    if (text === '') return null
+    out.text = text
   }
   // A picture or video with an unsafe address is dropped. YouTube addresses get "https://".
   if (node.type === 'image' && !isSafeMediaSrc(out.attrs?.src)) return null
