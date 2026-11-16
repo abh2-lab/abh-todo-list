@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeftIcon } from '@lucide/vue'
 import type { TocHeading } from '~/types/editor'
 import EditorRootComp from '~/components/editor/EditorRoot.vue'
 
@@ -75,9 +76,7 @@ function jumpToHeading(pos: number) {
         class="flex items-center justify-center w-8 h-8 rounded text-[#999] hover:text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors shrink-0"
         title="All Notes"
       >
-        <svg width="14" height="14" viewBox="0 0 10 10" fill="none">
-          <path d="M6.5 1.5L3 5l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <ChevronLeftIcon :size="20" />
       </NuxtLink>
 
       <span class="text-sm text-[#c0c0c0] truncate flex-1 min-w-0">

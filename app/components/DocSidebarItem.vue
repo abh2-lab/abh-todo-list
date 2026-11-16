@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FileTextIcon, LockIcon, Trash2Icon } from '@lucide/vue'
 import type { DocMeta } from '~/types/docs'
 
 // One note in the sidebar list. Long names are cut off with "…": hover a note to see its full name.
@@ -36,24 +37,18 @@ function relativeTime(date: string | Date) {
     />
 
     <!-- Icon: lock = private, page = public -->
-    <svg
+    <LockIcon
       v-if="doc.isPrivate"
-      class="w-3.5 h-3.5 shrink-0 transition-colors mt-0.5"
+      :size="15"
+      class="shrink-0 transition-colors mt-0.5"
       :class="active ? 'text-[#6366f1]' : 'text-[#333] group-hover:text-[#555]'"
-      viewBox="0 0 14 14" fill="none"
-    >
-      <rect x="3" y="6.25" width="8" height="5.75" rx="1" stroke="currentColor" stroke-width="1.1"/>
-      <path d="M4.75 6.25V4.5a2.25 2.25 0 014.5 0v1.75" stroke="currentColor" stroke-width="1.1"/>
-    </svg>
-    <svg
+    />
+    <FileTextIcon
       v-else
-      class="w-3.5 h-3.5 shrink-0 transition-colors mt-0.5"
+      :size="15"
+      class="shrink-0 transition-colors mt-0.5"
       :class="active ? 'text-[#6366f1]' : 'text-[#333] group-hover:text-[#555]'"
-      viewBox="0 0 14 14" fill="none"
-    >
-      <path d="M2.5 2h6l3 3v7h-9V2z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
-      <path d="M8.5 2v3h3" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
-    </svg>
+    />
 
     <!-- Title + date -->
     <div class="flex-1 min-w-0">
@@ -74,9 +69,7 @@ function relativeTime(date: string | Date) {
       title="Delete"
       @click.stop="emit('delete')"
     >
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-        <path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <Trash2Icon :size="14" />
     </button>
   </div>
 </template>

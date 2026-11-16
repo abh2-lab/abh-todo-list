@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeftIcon, ChevronRightIcon } from '@lucide/vue'
 // A month calendar with one dot per task. Used by Daily tasks and by its share page.
 // green = done, red = not done and the day is over, grey = not done yet
 interface DayTask {
@@ -133,7 +134,7 @@ onBeforeUnmount(() => dotObserver?.disconnect())
         title="Previous month"
         @click="emit('change-month', -1)"
       >
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M8.5 3L4.5 7l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <ChevronLeftIcon :size="16" />
       </button>
       <h2 class="flex-1 text-center text-sm font-medium text-[#e0e0e0] select-none">{{ monthLabel }}</h2>
       <button
@@ -143,7 +144,7 @@ onBeforeUnmount(() => dotObserver?.disconnect())
         title="Next month"
         @click="emit('change-month', 1)"
       >
-        <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M5.5 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <ChevronRightIcon :size="16" />
       </button>
       <button v-if="todayButton" class="btn" @click="emit('today')">Today</button>
       <slot name="actions" />

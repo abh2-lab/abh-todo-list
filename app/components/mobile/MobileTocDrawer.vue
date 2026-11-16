@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { XIcon } from '@lucide/vue'
 import type { TocHeading } from '~/types/editor'
 
 const props = defineProps<{
@@ -53,9 +54,7 @@ const indentMap: Record<number, string> = {
             title="Close"
             @click="emit('close')"
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
+            <XIcon :size="16" />
           </button>
         </div>
 

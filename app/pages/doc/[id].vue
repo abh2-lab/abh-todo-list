@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeftIcon } from '@lucide/vue'
 import type { TocHeading } from '~/types/editor'
 
 const route = useRoute()
@@ -56,9 +57,7 @@ function formatDate(d: string) {
           to="/"
           class="flex items-center gap-1.5 text-2xs text-[#555] hover:text-[#999] transition-colors"
         >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M6.5 1.5L3 5l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <ChevronLeftIcon :size="14" />
           All Notes
         </NuxtLink>
 

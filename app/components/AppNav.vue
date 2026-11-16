@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BellIcon, CalendarDaysIcon, CircleHelpIcon, FileTextIcon, LogInIcon } from '@lucide/vue'
 import type { AppView } from '~/types/docs'
 
 // Center of the header: who is logged in, and the parts of the app.
@@ -55,10 +56,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
         title="Notes"
         @click="emit('update:view', 'notes')"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M2.5 2h6l3 3v7h-9V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-          <path d="M8.5 2v3h3M4.5 7.5h5M4.5 9.75h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <FileTextIcon :size="16" />
         <span class="hidden lg:inline">Notes</span>
       </button>
 
@@ -69,10 +67,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
         title="Daily tasks"
         @click="emit('update:view', 'tasks')"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect x="1.75" y="2.75" width="10.5" height="9.5" rx="1.5" stroke="currentColor" stroke-width="1.2"/>
-          <path d="M1.75 5.75h10.5M4.5 1.5V4M9.5 1.5V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
+        <CalendarDaysIcon :size="16" />
         <span class="hidden lg:inline">Daily tasks</span>
       </button>
 
@@ -82,10 +77,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
         :title="pendingCount ? `${pendingCount} pending ${pendingCount === 1 ? 'task' : 'tasks'}` : 'No pending tasks'"
         @click="emit('open-pending')"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M3.5 9.5V6.5a3.5 3.5 0 017 0v3l1 1.5h-9l1-1.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-          <path d="M5.75 12.25a1.25 1.25 0 002.5 0" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        </svg>
+        <BellIcon :size="16" />
         <span class="hidden lg:inline">Pending</span>
         <span v-if="pendingCount > 0" class="pending-badge">{{ pendingCount }}</span>
       </button>
@@ -93,28 +85,18 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
 
     <template v-else>
       <span class="nav-btn nav-btn-active max-md:px-2 cursor-default" title="Notes">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M2.5 2h6l3 3v7h-9V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-          <path d="M8.5 2v3h3M4.5 7.5h5M4.5 9.75h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <FileTextIcon :size="16" />
         <span class="hidden lg:inline">Notes</span>
       </span>
       <a :href="loginUrl" class="btn btn-accent h-9" data-tour="login" title="Login with Google to keep private notes and daily tasks">
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M8.5 2.5h2.25a1 1 0 011 1v7a1 1 0 01-1 1H8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-          <path d="M2 7h6.5M6 4.5L8.5 7 6 9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <LogInIcon :size="16" />
         Login with Google
       </a>
     </template>
 
     <!-- Help: a short tour of the app -->
     <button class="nav-btn max-md:px-2" data-tour="help" title="Help: a short tour of the app" @click="startTour">
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-        <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2"/>
-        <path d="M5.35 5.6a1.7 1.7 0 113.2.75c-.35.6-1.55.95-1.55 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-        <circle cx="7" cy="10.15" r=".7" fill="currentColor"/>
-      </svg>
+      <CircleHelpIcon :size="16" />
       <span class="hidden lg:inline">Help</span>
     </button>
   </nav>

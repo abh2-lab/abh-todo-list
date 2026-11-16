@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronRightIcon, PlusIcon } from '@lucide/vue'
 import type { DocMeta } from '~/types/docs'
 
 const props = defineProps<{
@@ -44,7 +45,7 @@ function handleDelete(id: string) {
 <template>
   <aside
     class="flex flex-col bg-[#080808] border-r border-[#1f1f1f] shadow-2xl shadow-black"
-    :class="wide ? 'w-72 max-w-[85vw]' : 'w-60'"
+    :class="wide ? 'w-72 max-w-[85vw]' : 'w-64'"
   >
     <!-- Phone: who is logged in + the parts of the app -->
     <slot name="top" />
@@ -60,9 +61,7 @@ function handleDelete(id: string) {
         :title="loggedIn ? 'New private note (named with today\'s date)' : 'New document'"
         @click="emit('new-doc', { private: true })"
       >
-        <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-          <path d="M4.5 1v7M1 4.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+        <PlusIcon :size="14" />
         New
       </button>
     </div>
@@ -114,24 +113,20 @@ function handleDelete(id: string) {
             :title="publicOpen ? 'Hide public notes' : 'Show public notes'"
             @click="publicOpen = !publicOpen"
           >
-            <svg
-              class="w-2.5 h-2.5 shrink-0 transition-transform"
+            <ChevronRightIcon
+              :size="14"
+              class="shrink-0 transition-transform"
               :class="{ 'rotate-90': publicOpen }"
-              viewBox="0 0 10 10" fill="none"
-            >
-              <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span class="font-semibold uppercase tracking-wider">Public notes</span>
-            <span class="text-[#333] truncate"> · everyone ({{ publicDocs.length }})</span>
+            />
+            <span class="shrink-0 whitespace-nowrap font-semibold uppercase tracking-wider">Public notes</span>
+            <span class="min-w-0 text-[#333] truncate">· everyone ({{ publicDocs.length }})</span>
           </button>
           <button
             class="w-6 h-6 flex items-center justify-center rounded text-[#555] hover:text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors shrink-0"
             title="New public note (everyone can see and edit it)"
             @click="emit('new-doc', { private: false })"
           >
-            <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-              <path d="M4.5 1v7M1 4.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
+            <PlusIcon :size="14" />
           </button>
         </div>
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { EyeIcon, LockIcon, PanelLeftIcon, PencilIcon, PlusIcon } from '@lucide/vue'
 import type { AppView } from '~/types/docs'
 
 const props = defineProps<{
@@ -62,21 +63,14 @@ function onTitleKeydown(e: KeyboardEvent) {
         :title="sidebarOpen ? 'Hide notes' : 'Show notes'"
         @click="emit('toggle-sidebar')"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="2.5" width="14" height="1.5" rx="0.75" fill="currentColor"/>
-          <rect x="1" y="7.25" width="10" height="1.5" rx="0.75" fill="currentColor"/>
-          <rect x="1" y="12" width="12" height="1.5" rx="0.75" fill="currentColor"/>
-        </svg>
+        <PanelLeftIcon :size="18" />
       </button>
 
       <div class="w-px h-5 bg-[#1f1f1f] shrink-0" />
 
       <div v-if="view === 'notes'" class="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
         <span v-if="isPrivate" class="shrink-0 text-[#6366f1]" title="Private note: only you can see it">
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-            <rect x="3" y="6.25" width="8" height="5.75" rx="1" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M4.75 6.25V4.5a2.25 2.25 0 014.5 0v1.75" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
+          <LockIcon :size="14" />
         </span>
         <input
           v-if="editingTitle"
@@ -141,20 +135,15 @@ function onTitleKeydown(e: KeyboardEvent) {
 
         <button
           data-tour="view-mode"
-          class="flex items-center gap-1.5 text-btn px-3 py-1.5 rounded border transition-colors shrink-0"
+          class="flex items-center gap-1.5 text-btn px-3 max-md:px-2 py-1.5 rounded border transition-colors shrink-0"
           :class="viewMode
             ? 'bg-[#6366f1]/10 border-[#6366f1]/30 text-[#818cf8] hover:bg-[#6366f1]/20'
             : 'bg-[#111] border-[#1f1f1f] text-[#888] hover:text-[#f0f0f0] hover:bg-[#1a1a1a]'"
           :title="viewMode ? 'Switch to edit mode' : 'Switch to view mode'"
           @click="emit('toggle-view-mode')"
         >
-          <svg v-if="!viewMode" width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M1 6C2 3.5 3.8 2 6 2s4 1.5 5 4c-1 2.5-2.8 4-5 4s-4-1.5-5-4z" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          <svg v-else width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M9 1.5l1.5 1.5-7 7L2 10.5l.5-1.5 7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
-          </svg>
+          <EyeIcon v-if="!viewMode" :size="16" />
+          <PencilIcon v-else :size="16" />
           <span class="hidden xl:inline">{{ viewMode ? 'Edit' : 'View' }}</span>
         </button>
 
@@ -167,14 +156,12 @@ function onTitleKeydown(e: KeyboardEvent) {
         />
 
         <button
-          class="flex items-center gap-1.5 text-btn px-3 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#888] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors shrink-0"
+          class="flex items-center gap-1.5 text-btn px-3 max-md:px-2 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#888] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors shrink-0"
           data-tour="new-note"
           title="New document"
           @click="emit('new-doc')"
         >
-          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-            <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <PlusIcon :size="16" />
           <span class="hidden xl:inline">New</span>
         </button>
       </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { BoldIcon, CalendarCheckIcon, CodeIcon, Grid2x2XIcon, ImageIcon, ItalicIcon, LinkIcon, ListIcon, ListOrderedIcon, ListTodoIcon, MinusIcon, PanelTopIcon, QuoteIcon, Redo2Icon, SquareCodeIcon, SquarePlayIcon, StrikethroughIcon, TableIcon, Undo2Icon, UnlinkIcon } from '@lucide/vue'
+import { TableColumnDeleteIcon, TableColumnLeftIcon, TableColumnRightIcon, TableRowAboveIcon, TableRowBelowIcon, TableRowDeleteIcon } from '~/lib/tableIcons'
 import type { Editor } from '@tiptap/vue-3'
 import { isOnTaskLine } from '~/lib/taskLines'
 import { youtubeSrc } from '#shared/noteContent'
@@ -115,39 +117,39 @@ const buttons = computed<BtnDef[]>(() => {
 
       <!-- Bold -->
       <button title="Bold (Ctrl+B)" class="toolbar-btn" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M4 3h4a2.5 2.5 0 010 5H4V3zM4 8h4.5a2.5 2.5 0 010 5H4V8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        <BoldIcon :size="18" />
       </button>
 
       <!-- Italic -->
       <button title="Italic (Ctrl+I)" class="toolbar-btn" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M9 2H6M8 12H5M7.5 2l-3 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <ItalicIcon :size="18" />
       </button>
 
       <!-- Strikethrough -->
       <button title="Strikethrough" class="toolbar-btn" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M5 4a2 2 0 014 0c0 1-1 1.5-2 2M5 10a2 2 0 004 0c0-1-1-1.5-2-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <StrikethroughIcon :size="18" />
       </button>
 
       <!-- Inline code -->
       <button title="Inline Code" class="toolbar-btn" :class="{ active: editor.isActive('code') }" @click="editor.chain().focus().toggleCode().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M5 4L2 7l3 3M9 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <CodeIcon :size="18" />
       </button>
 
       <div class="toolbar-sep" />
 
       <!-- Bullet list -->
       <button title="Bullet List" class="toolbar-btn" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><circle cx="2.5" cy="4" r="1" fill="currentColor"/><circle cx="2.5" cy="7" r="1" fill="currentColor"/><circle cx="2.5" cy="10" r="1" fill="currentColor"/><path d="M5 4h7M5 7h7M5 10h7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <ListIcon :size="18" />
       </button>
 
       <!-- Ordered list -->
       <button title="Numbered List" class="toolbar-btn" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M1.5 3h1.2M2.7 3V6M1.5 6h1.2M1.5 7h1.2l-1.2 2.5h1.2M1.5 11.5h1.2" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M6 4h6M6 7h6M6 10.5h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <ListOrderedIcon :size="18" />
       </button>
 
       <!-- Task list -->
       <button title="Checklist" class="toolbar-btn" :class="{ active: editor.isActive('taskList') }" @click="editor.chain().focus().toggleTaskList().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="3" width="3" height="3" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M2 4.5l.8.8 1.6-1.6" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/><rect x="1.5" y="8.5" width="3" height="3" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 4.5h6M6 10h6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <ListTodoIcon :size="18" />
       </button>
 
       <!-- Today's task: put this line in today's Daily tasks list (click again to take it off) -->
@@ -160,7 +162,7 @@ const buttons = computed<BtnDef[]>(() => {
         :disabled="!editor.can().toggleTodayTask()"
         @click="editor.chain().focus().toggleTodayTask().run()"
       >
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M4.5 1.25v2.25M9.5 1.25v2.25" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M4.8 9l1.4 1.4 3-3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <CalendarCheckIcon :size="18" />
         <span class="hidden sm:inline text-xs whitespace-nowrap">Today's task</span>
       </button>
 
@@ -168,47 +170,47 @@ const buttons = computed<BtnDef[]>(() => {
 
       <!-- Blockquote -->
       <button title="Blockquote" class="toolbar-btn" :class="{ active: editor.isActive('blockquote') }" @click="editor.chain().focus().toggleBlockquote().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M2 4c0 2 1 3 2 3M7 4c0 2 1 3 2 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M2 11h1.5M7 11H8.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+        <QuoteIcon :size="18" />
       </button>
 
       <!-- Code block -->
       <button title="Code Block" class="toolbar-btn" :class="{ active: editor.isActive('codeBlock') }" @click="editor.chain().focus().toggleCodeBlock().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M5 5.5L3 7l2 1.5M9 5.5L11 7l-2 1.5M6.5 5l1 4" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <SquareCodeIcon :size="18" />
       </button>
 
       <!-- Horizontal rule -->
       <button title="Divider" class="toolbar-btn" @click="editor.chain().focus().setHorizontalRule().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M1 7h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <MinusIcon :size="18" />
       </button>
 
       <div class="toolbar-sep" />
 
       <!-- Insert image -->
       <button title="Insert Image" class="toolbar-btn" @click="imageInput?.click()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><circle cx="4.5" cy="5.5" r="1" fill="currentColor"/><path d="M1 10l3.5-3.5 2.5 2.5 2-2L13 11" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <ImageIcon :size="18" />
       </button>
       <input ref="imageInput" type="file" accept="image/*" class="hidden" @change="insertImage" />
 
       <!-- Insert YouTube -->
       <button title="Insert YouTube Video" class="toolbar-btn" @click="showYoutubeModal = true">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M6 5.5l3 1.5-3 1.5V5.5z" fill="currentColor"/></svg>
+        <SquarePlayIcon :size="18" />
       </button>
 
       <div class="toolbar-sep" />
 
       <!-- Add / Edit Link -->
       <button title="Add / Edit Link" class="toolbar-btn" :class="{ active: editor.isActive('link') }" @click="openLinkModal">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M6 8a2.5 2.5 0 003.5 0l2-2A2.5 2.5 0 008 2.5l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6a2.5 2.5 0 00-3.5 0l-2 2A2.5 2.5 0 006 11.5l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <LinkIcon :size="18" />
       </button>
 
       <!-- Remove Link (contextual) -->
       <button v-if="editor.isActive('link')" title="Remove Link" class="toolbar-btn" @click="removeLink">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><path d="M6 8a2.5 2.5 0 003.5 0l1-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 6a2.5 2.5 0 00-3.5 0l-1 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 2l10 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        <UnlinkIcon :size="18" />
       </button>
 
       <!-- Insert Table -->
       <button title="Insert Table" class="toolbar-btn" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M1.5 8.5h11M5 2.5v9M8.5 2.5v9" stroke="currentColor" stroke-width="1"/></svg>
+        <TableIcon :size="18" />
       </button>
 
       <!-- Contextual table controls -->
@@ -217,42 +219,42 @@ const buttons = computed<BtnDef[]>(() => {
 
         <!-- Add Row Above -->
         <button title="Add Row Above" class="toolbar-btn" :disabled="!editor.can().addRowBefore()" @click="editor.chain().focus().addRowBefore().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="5" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5v7M8.5 5v7" stroke="currentColor" stroke-width="1"/><path d="M7 1v3M5.5 2.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableRowAboveIcon :size="18" />
         </button>
 
         <!-- Add Row Below -->
         <button title="Add Row Below" class="toolbar-btn" :disabled="!editor.can().addRowAfter()" @click="editor.chain().focus().addRowAfter().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h11M5 2v7M8.5 2v7" stroke="currentColor" stroke-width="1"/><path d="M7 10v3M5.5 11.5h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableRowBelowIcon :size="18" />
         </button>
 
         <!-- Add Column Left -->
         <button title="Add Column Left" class="toolbar-btn" :disabled="!editor.can().addColumnBefore()" @click="editor.chain().focus().addColumnBefore().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="4" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2v10M4 5h8.5M4 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M1.5 7h3M3 5.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableColumnLeftIcon :size="18" />
         </button>
 
         <!-- Add Column Right -->
         <button title="Add Column Right" class="toolbar-btn" :disabled="!editor.can().addColumnAfter()" @click="editor.chain().focus().addColumnAfter().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 2v10M1.5 5h8.5M1.5 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M9.5 7h3M11 5.5v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableColumnRightIcon :size="18" />
         </button>
 
         <!-- Delete Row -->
         <button title="Delete Row" class="toolbar-btn" :disabled="!editor.can().deleteRow()" @click="editor.chain().focus().deleteRow().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="5" width="11" height="7" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5v7M8.5 5v7" stroke="currentColor" stroke-width="1"/><path d="M5.5 1.5l3 3M5.5 4.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableRowDeleteIcon :size="18" />
         </button>
 
         <!-- Delete Column -->
         <button title="Delete Column" class="toolbar-btn" :disabled="!editor.can().deleteColumn()" @click="editor.chain().focus().deleteColumn().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="4" y="2" width="8.5" height="10" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 2v10M4 5h8.5M4 8.5h8.5" stroke="currentColor" stroke-width="1"/><path d="M1.5 5.5l3 3M1.5 8.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <TableColumnDeleteIcon :size="18" />
         </button>
 
         <!-- Toggle Header Row -->
         <button title="Toggle Header Row" class="toolbar-btn" :class="{ active: editor.isActive('tableHeader') }" @click="editor.chain().focus().toggleHeaderRow().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="11" height="3" rx="0.5" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.2"/><rect x="1.5" y="5.5" width="11" height="6" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 8.5h11M5 5.5v6M8.5 5.5v6" stroke="currentColor" stroke-width="1"/></svg>
+          <PanelTopIcon :size="18" />
         </button>
 
         <!-- Delete Table -->
         <button title="Delete Table" class="toolbar-btn" @click="editor.chain().focus().deleteTable().run()">
-          <svg width="17" height="17" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="2.5" width="8" height="9" rx="0.5" stroke="currentColor" stroke-width="1.2"/><path d="M1.5 5.5h8M1.5 8.5h8M4.5 2.5v9" stroke="currentColor" stroke-width="1"/><path d="M10.5 2.5l3 3M10.5 5.5l3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          <Grid2x2XIcon :size="18" />
         </button>
       </template>
 
@@ -260,18 +262,12 @@ const buttons = computed<BtnDef[]>(() => {
 
       <!-- Undo -->
       <button title="Undo (Ctrl+Z)" class="toolbar-btn" :disabled="!editor.can().undo()" @click="editor.chain().focus().undo().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none">
-          <path d="M2 5.5h6a3.5 3.5 0 010 7H4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M4.5 3L2 5.5l2.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <Undo2Icon :size="18" />
       </button>
 
       <!-- Redo -->
       <button title="Redo (Ctrl+Shift+Z)" class="toolbar-btn" :disabled="!editor.can().redo()" @click="editor.chain().focus().redo().run()">
-        <svg width="17" height="17" viewBox="0 0 14 14" fill="none">
-          <path d="M12 5.5H6a3.5 3.5 0 000 7h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M9.5 3L12 5.5 9.5 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <Redo2Icon :size="18" />
       </button>
     </template>
   </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CheckIcon, ExternalLinkIcon, LinkIcon, Trash2Icon } from '@lucide/vue'
 import type { Task } from '~/types/tasks'
 
 // Daily tasks: a month calendar (left) and the tasks of the chosen day (right).
@@ -274,10 +275,7 @@ watch(selected, () => {
       >
         <template #actions>
           <button class="btn" title="Share your tasks of some months with a view-only link" @click="shareOpen = true">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-              <path d="M5 7a3 3 0 004.2 0l1.5-1.5a3 3 0 00-4.2-4.2L5.8 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              <path d="M7 5a3 3 0 00-4.2 0L1.3 6.5a3 3 0 004.2 4.2L6.2 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-            </svg>
+            <LinkIcon :size="15" />
             Share
           </button>
         </template>
@@ -351,7 +349,7 @@ watch(selected, () => {
               :aria-label="`Select: ${t.text || 'Empty line'}`"
               @click.stop="togglePick(t)"
             >
-              <svg v-if="picked.has(t.id)" width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <CheckIcon v-if="picked.has(t.id)" :size="13" :stroke-width="3" />
             </button>
             <button
               v-else
@@ -360,7 +358,7 @@ watch(selected, () => {
               :title="t.done ? 'Mark as not done' : 'Mark as done'"
               @click="toggleDone(t)"
             >
-              <svg v-if="t.done" width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <CheckIcon v-if="t.done" :size="13" :stroke-width="3" />
             </button>
 
             <div class="flex-1 min-w-0">
@@ -401,7 +399,7 @@ watch(selected, () => {
                   title="Open the note at this line (new tab)"
                 >
                   Open note
-                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <ExternalLinkIcon :size="13" />
                 </a>
               </div>
               <div v-if="datePickId === t.id && !selecting" class="flex flex-wrap items-center gap-1.5 mt-1.5">
@@ -426,7 +424,7 @@ watch(selected, () => {
               :title="t.docId ? 'Remove from the list (the line stays in the note)' : 'Delete task'"
               @click="removeTask(t)"
             >
-              <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <Trash2Icon :size="15" />
             </button>
           </li>
         </ul>

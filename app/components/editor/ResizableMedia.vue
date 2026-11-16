@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { MaximizeIcon, MoveDiagonal2Icon, XIcon } from '@lucide/vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 
 const props = defineProps<{
@@ -108,9 +109,7 @@ function startResize(e: MouseEvent, direction: string) {
           class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100 z-10"
           @mousedown.prevent="startResize($event, 'se')"
         >
-          <svg class="w-4 h-4 text-[#6366f1]" viewBox="0 0 16 16" fill="none">
-            <path d="M4 12l8-8M8 12h4V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <MoveDiagonal2Icon :size="16" class="text-[#6366f1]" />
         </div>
       </template>
 
@@ -120,9 +119,7 @@ function startResize(e: MouseEvent, direction: string) {
         title="Fullscreen"
         @click.prevent="isFullscreen = true"
       >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <MaximizeIcon :size="15" />
       </button>
     </div>
 
@@ -137,9 +134,7 @@ function startResize(e: MouseEvent, direction: string) {
           class="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full bg-[#111] text-[#999] hover:text-white hover:bg-[#1a1a1a] transition-colors"
           @click="isFullscreen = false"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <XIcon :size="18" />
         </button>
 
         <img

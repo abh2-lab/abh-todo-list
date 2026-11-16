@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { TableOfContentsIcon } from '@lucide/vue'
 defineEmits<{
   click: []
 }>()
@@ -10,8 +11,6 @@ defineEmits<{
     title="Show outline"
     @click="$emit('click')"
   >
-    <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-      <path d="M2 4h12M5 8h9M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+    <TableOfContentsIcon :size="20" />
   </button>
 </template>

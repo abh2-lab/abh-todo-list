@@ -11,6 +11,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@lucide/vue": "^1.70.0",
     "@tiptap/extension-image": "^3.33.0",
     "@tiptap/extension-link": "^3.33.0",
     "@tiptap/extension-list": "^3.33.0",

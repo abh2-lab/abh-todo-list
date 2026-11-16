@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CheckIcon } from '@lucide/vue'
 import type { SharedTask } from '~/types/tasks'
 
 // One task on the share page (view only): done or not, the text, and a few facts.
@@ -19,7 +20,7 @@ const overdue = computed(() => !props.task.done && props.task.day < props.today)
       role="img"
       :aria-label="task.done ? 'Done' : 'Not done'"
     >
-      <svg v-if="task.done" width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <CheckIcon v-if="task.done" :size="13" :stroke-width="3" />
     </span>
     <div class="flex-1 min-w-0">
       <div

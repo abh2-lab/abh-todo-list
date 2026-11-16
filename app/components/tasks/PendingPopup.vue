@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ArrowRightIcon, CheckIcon, ExternalLinkIcon, Trash2Icon } from '@lucide/vue'
 import type { Task } from '~/types/tasks'
 
 // List of pending tasks (day is over, still not done).
@@ -71,15 +72,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               <div class="text-2xs mt-0.5 text-[#ef4444]">From {{ shortDay(t.day) }}</div>
               <div class="flex flex-wrap gap-2 mt-2" :class="{ 'opacity-50 pointer-events-none': busyId === t.id }">
                 <button class="btn" @click="run(t.id, markDone)">
-                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <CheckIcon :size="15" />
                   Done
                 </button>
                 <button class="btn btn-accent" @click="run(t.id, moveToToday)">
-                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M8 3.5L11.5 7 8 10.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <ArrowRightIcon :size="15" />
                   Move to today
                 </button>
                 <button class="btn" :title="t.docId ? 'Remove from the list (the line stays in the note)' : 'Delete task'" @click="remove(t)">
-                  <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M1 2h8M3 2V1.5a.5.5 0 011 0V2M2.5 2l.5 7h3.5l.5-7" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <Trash2Icon :size="15" />
                   Delete
                 </button>
                 <a
@@ -91,7 +92,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                   title="Open the note at this line (new tab)"
                 >
                   Open note
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M4 2H2v6h6V6M6 2h2v2M8 2L4.5 5.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <ExternalLinkIcon :size="14" />
                 </a>
               </div>
             </li>
