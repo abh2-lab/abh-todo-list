@@ -4,7 +4,7 @@
 // The same id is the task's id in the Daily tasks list, so the two stay linked:
 // - editing the line's text changes the task text (its done / day stay the same),
 // - ticking a checklist line marks the task done, and the other way round,
-// - the line shows a small tag: "Task · today", "Task · done", ...
+// - the line shows a small tag: "Task · today", "Task · done", "Task · cancelled", ...
 //
 // The editor only knows the tasks of the open note (storage.tasks). The code that talks to
 // the server (useLineTasks) fills that map and gets told when lines are marked or ticked.
@@ -21,6 +21,8 @@ export interface LineTask {
   done: boolean
   /** The day it is planned for, like 2026-11-09. */
   day: string
+  /** The person decided not to do it. */
+  cancelled?: boolean
 }
 
 export interface TaskLinesStorage {
@@ -133,10 +135,14 @@ function buildTags(doc: PMNode, storage: TaskLinesStorage): DecorationSet {
     const task = id ? storage.tasks.get(id) : undefined
     if (!task || !LINE_TYPES.includes(node.type.name)) return true
 
-    const state = task.done ? 'done' : task.day < today ? 'late' : task.day === today ? 'today' : 'later'
+    const state = task.done
+      ? 'done'
+      : task.cancelled ? 'cancelled' : task.day < today ? 'late' : task.day === today ? 'today' : 'later'
     const tag = state === 'done'
       ? 'Task · done'
-      : state === 'late'
+      : state === 'cancelled'
+        ? 'Task · cancelled'
+        : state === 'late'
         ? 'Task · not done'
         : state === 'today'
           ? 'Task · today'
@@ -343,7 +349,8 @@ export const TaskLines = Extension.create<object, TaskLinesStorage>({
     for (const [id, ticked] of after) {
       const task = storage.tasks.get(id)
       if (!task || !before.has(id) || before.get(id) === ticked) continue
-      storage.tasks.set(id, { ...task, done: ticked })
+      // Ticked = done, and done takes the cancel off.
+      storage.tasks.set(id, { ...task, done: ticked, cancelled: ticked ? false : task.cancelled })
       changed = true
       storage.onCheck?.(id, ticked)
     }

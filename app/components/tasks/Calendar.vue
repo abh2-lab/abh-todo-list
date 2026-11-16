@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ChevronLeftIcon, ChevronRightIcon } from '@lucide/vue'
+import type { TaskState } from '~/utils/taskStatus'
 // A month calendar with one dot per task. Used by Daily tasks and by its share page.
-// green = done, red = not done and the day is over, grey = not done yet
+// green = done, red = not done and the day is over, grey = not done yet, amber = cancelled
 interface DayTask {
   day: string
   done: boolean
+  cancelled?: boolean
 }
 
 const props = defineProps<{
@@ -52,22 +54,22 @@ const byDay = computed(() => {
 })
 
 const monthStats = computed(() => {
-  let done = 0
-  let notDone = 0
-  let toDo = 0
+  const n = { done: 0, cancelled: 0, late: 0, todo: 0 }
   for (const t of props.tasks) {
-    if (!t.day.startsWith(monthPrefix.value)) continue
-    if (t.done) done++
-    else if (t.day < props.today) notDone++
-    else toDo++
+    if (t.day.startsWith(monthPrefix.value)) n[taskState(t, props.today)]++
   }
-  return { done, notDone, toDo }
+  return n
 })
 
+const DOT_CLASS: Record<TaskState, string> = {
+  done: 'bg-[#22c55e]',
+  cancelled: 'bg-[#f59e0b]',
+  late: 'bg-[#ef4444]',
+  todo: 'bg-[#4a4a4a]',
+}
+
 function dotClass(t: DayTask) {
-  if (t.done) return 'bg-[#22c55e]'
-  if (t.day < props.today) return 'bg-[#ef4444]'
-  return 'bg-[#4a4a4a]'
+  return DOT_CLASS[taskState(t, props.today)]
 }
 
 // ---- Dots in the calendar: as many as fit in a day box, then "+3" for the rest ----
@@ -195,11 +197,15 @@ onBeforeUnmount(() => dotObserver?.disconnect())
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />Done</span>
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />Not done (day is over)</span>
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#4a4a4a]" />Not done yet</span>
+      <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />Cancelled</span>
     </div>
     <div class="mt-2 text-xs text-[#555]">
       This month: <span class="text-[#22c55e]">{{ monthStats.done }} done</span>
-      · <span :class="monthStats.notDone ? 'text-[#ef4444]' : ''">{{ monthStats.notDone }} not done</span>
-      · <span :class="monthStats.toDo ? 'text-[#999]' : ''">{{ monthStats.toDo }} to do</span>
+      · <span :class="monthStats.late ? 'text-[#ef4444]' : ''">{{ monthStats.late }} not done</span>
+      · <span :class="monthStats.todo ? 'text-[#999]' : ''">{{ monthStats.todo }} to do</span>
+      <template v-if="monthStats.cancelled">
+        · <span class="text-[#f59e0b]">{{ monthStats.cancelled }} cancelled</span>
+      </template>
       <span v-if="loading" class="ml-2 text-[#333]">Loading…</span>
     </div>
     <p v-if="error" class="mt-2 text-xs text-[#ef4444]">{{ error }}</p>

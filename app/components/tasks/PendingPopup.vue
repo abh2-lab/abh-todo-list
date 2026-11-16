@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRightIcon, CheckIcon, ExternalLinkIcon, Trash2Icon } from '@lucide/vue'
+import { ArrowRightIcon, BanIcon, CheckIcon, ExternalLinkIcon, Trash2Icon } from '@lucide/vue'
 import type { Task } from '~/types/tasks'
 
 // List of pending tasks (day is over, still not done).
@@ -7,7 +7,7 @@ import type { Task } from '~/types/tasks'
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
-const { pending, markDone, moveToToday, removeTask } = usePendingTasks()
+const { pending, markDone, cancelTask, moveToToday, removeTask } = usePendingTasks()
 const busyId = ref<string | null>(null)
 const error = ref('')
 
@@ -53,7 +53,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         class="fixed inset-0 z-[9990] bg-black/70 flex items-center justify-center p-4"
         @click.self="emit('close')"
       >
-        <div class="w-full max-w-md max-h-[85vh] flex flex-col rounded-xl border border-[#1f1f1f] bg-[#0b0b0b] shadow-2xl shadow-black">
+        <div class="w-full max-w-lg max-h-[85vh] flex flex-col rounded-xl border border-[#1f1f1f] bg-[#0b0b0b] shadow-2xl shadow-black">
           <div class="px-5 pt-5 pb-3">
             <h3 class="text-sm font-medium text-[#f0f0f0]">
               <template v-if="pending.length">
@@ -78,6 +78,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
                 <button class="btn btn-accent" @click="run(t.id, moveToToday)">
                   <ArrowRightIcon :size="15" />
                   Move to today
+                </button>
+                <button class="btn" title="You decided not to do it. It stays in your history." @click="run(t.id, cancelTask)">
+                  <BanIcon :size="15" />
+                  Cancel task
                 </button>
                 <button class="btn" :title="t.docId ? 'Remove from the list (the line stays in the note)' : 'Delete task'" @click="remove(t)">
                   <Trash2Icon :size="15" />

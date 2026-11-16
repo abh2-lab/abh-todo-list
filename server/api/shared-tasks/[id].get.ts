@@ -3,7 +3,8 @@ import { useDb } from '../../db'
 import { taskShares, tasks, users } from '../../../db/schema'
 
 // The page behind a Daily tasks share link (/shared/tasks/<id>). No login needed: the link is the key.
-// It shows only the task text, its day, and whether it is done. Not which note it came from.
+// It shows only the task text, its day, whether it is done or cancelled, and the day it was done
+// (never the time). Not which note it came from.
 export default defineEventHandler(async (event) => {
   const notFound = () => createError({ statusCode: 404, message: 'This link does not work any more.' })
   const id = readShareId(getRouterParam(event, 'id'))
@@ -23,7 +24,15 @@ export default defineEventHandler(async (event) => {
   if (!share) throw notFound()
 
   const rows = await db
-    .select({ text: tasks.text, day: tasks.day, done: tasks.done, movedFrom: tasks.movedFrom })
+    .select({
+      text: tasks.text,
+      day: tasks.day,
+      done: tasks.done,
+      cancelled: tasks.cancelled,
+      movedFrom: tasks.movedFrom,
+      doneDay: tasks.doneDay,
+      doneAt: tasks.doneAt,
+    })
     .from(tasks)
     .where(and(
       eq(tasks.userId, share.userId),
@@ -38,6 +47,10 @@ export default defineEventHandler(async (event) => {
     name: firstName(share.name),
     from: share.fromMonth.slice(0, 7),
     to: share.toMonth.slice(0, 7),
-    tasks: rows,
+    // Only the day a task was done, not the time. Tasks done before the day was saved: the day in UTC.
+    tasks: rows.map(({ doneAt, ...t }) => ({
+      ...t,
+      doneDay: t.done ? (t.doneDay ?? doneAt?.toISOString().slice(0, 10) ?? null) : null,
+    })),
   }
 })

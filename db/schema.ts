@@ -33,6 +33,11 @@ export const tasks = pgTable('tasks', {
   day: date('day').notNull(),
   done: boolean('done').notNull().default(false),
   doneAt: timestamp('done_at'),
+  // The day it was done, in the person's own time, like 2026-11-12 (the browser sends it, like `day`).
+  // Empty for tasks done before this was added: then the day comes from doneAt.
+  doneDay: date('done_day'),
+  // The person decided not to do it. A cancelled task is never pending, and it is not done.
+  cancelled: boolean('cancelled').notNull().default(false),
   // If the task was moved to another day: the first day it was planned for.
   movedFrom: date('moved_from'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

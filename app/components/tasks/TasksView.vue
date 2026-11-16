@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckIcon, ExternalLinkIcon, LinkIcon, Trash2Icon } from '@lucide/vue'
+import { CheckIcon, ExternalLinkIcon, LinkIcon, Trash2Icon, XIcon } from '@lucide/vue'
 import type { Task } from '~/types/tasks'
 
 // Daily tasks: a month calendar (left) and the tasks of the chosen day (right).
@@ -30,13 +30,12 @@ const byDay = computed(() => {
 })
 
 const dayTasks = computed(() => byDay.value.get(selected.value) ?? [])
-const dayDone = computed(() => dayTasks.value.filter((t) => t.done).length)
 
 // "Share": a view-only link to the tasks of some months (tasks/ShareDialog.vue).
 const shareOpen = ref(false)
 
 function isPending(t: Task) {
-  return !t.done && t.day < today.value
+  return taskState(t, today.value) === 'late'
 }
 
 function tookLabel(t: Task) {
@@ -115,15 +114,37 @@ const busyId = ref<string | null>(null)
 
 async function toggleDone(t: Task) {
   const done = !t.done
-  t.done = done // show it right away
+  const wasCancelled = t.cancelled
+  // Show it right away. Done takes the cancel off.
+  t.done = done
+  if (done) t.cancelled = false
   actionError.value = ''
   notice.value = null
   try {
-    Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { done } }))
+    const body = done ? { done, doneDay: todayKey() } : { done }
+    Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body }))
     void tasksChanged() // the note ticks its checklist line too
   } catch {
     t.done = !done
+    t.cancelled = wasCancelled
     actionError.value = 'Could not save. Try again.'
+  }
+}
+
+/** Cancel a task (you decided not to do it; it stays in your history), or undo that. */
+async function setCancelled(t: Task, cancelled: boolean) {
+  if (busyId.value) return
+  busyId.value = t.id
+  actionError.value = ''
+  notice.value = null
+  datePickId.value = null
+  try {
+    Object.assign(t, await $fetch<Task>(`/api/tasks/${t.id}`, { method: 'PUT', body: { cancelled } }))
+    void tasksChanged() // the tag in the note and the pending list change too
+  } catch {
+    actionError.value = cancelled ? 'Could not cancel the task. Try again.' : 'Could not undo. Try again.'
+  } finally {
+    busyId.value = null
   }
 }
 
@@ -193,7 +214,7 @@ async function removeTask(t: Task) {
   }
 }
 
-// ---- Select many: mark done or delete together ----
+// ---- Select many: mark done, cancel or delete together ----
 const selecting = ref(false)
 const picked = ref(new Set<string>())
 const pickedTasks = computed(() => dayTasks.value.filter((t) => picked.value.has(t.id)))
@@ -222,7 +243,7 @@ function togglePickAll() {
   picked.value = allPicked.value ? new Set() : new Set(dayTasks.value.map((t) => t.id))
 }
 
-async function bulk(action: 'done' | 'delete') {
+async function bulk(action: 'done' | 'cancel' | 'delete') {
   const list = pickedTasks.value
   if (list.length === 0 || bulkBusy.value) return
   if (action === 'delete') {
@@ -236,11 +257,13 @@ async function bulk(action: 'done' | 'delete') {
   actionError.value = ''
   notice.value = null
   try {
-    await $fetch('/api/tasks/bulk', { method: 'POST', body: { ids: list.map((t) => t.id), action } })
+    await $fetch('/api/tasks/bulk', { method: 'POST', body: { ids: list.map((t) => t.id), action, doneDay: todayKey() } })
     stopSelect()
     await tasksChanged()
   } catch {
-    actionError.value = action === 'done' ? 'Could not mark them done. Try again.' : 'Could not remove them. Try again.'
+    actionError.value = action === 'done'
+      ? 'Could not mark them done. Try again.'
+      : action === 'cancel' ? 'Could not cancel them. Try again.' : 'Could not remove them. Try again.'
   } finally {
     bulkBusy.value = false
   }
@@ -290,7 +313,7 @@ watch(selected, () => {
               <span v-if="selected === today" class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
             </div>
             <div class="text-xs text-[#555] mt-0.5">
-              {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day.' }}
+              {{ dayTasks.length ? doneText(dayTasks) : 'No tasks for this day.' }}
             </div>
           </div>
           <button v-if="dayTasks.length && !selecting" class="btn btn-sm shrink-0" @click="startSelect">Select</button>
@@ -307,6 +330,14 @@ watch(selected, () => {
             @click="bulk('done')"
           >
             Mark done ({{ pickedTasks.length }})
+          </button>
+          <button
+            class="btn btn-sm"
+            title="You decided not to do them. They stay in your history."
+            :class="{ 'opacity-40 pointer-events-none': !pickedTasks.length || bulkBusy }"
+            @click="bulk('cancel')"
+          >
+            Mark cancelled ({{ pickedTasks.length }})
           </button>
           <button
             class="btn btn-sm btn-danger"
@@ -354,41 +385,62 @@ watch(selected, () => {
             <button
               v-else
               class="mt-0.5 w-[18px] h-[18px] shrink-0 rounded border flex items-center justify-center transition-colors"
-              :class="t.done ? 'bg-[#22c55e]/15 border-[#22c55e]/60 text-[#22c55e]' : 'border-[#333] hover:border-[#6366f1]'"
-              :title="t.done ? 'Mark as not done' : 'Mark as done'"
+              :class="t.done
+                ? 'bg-[#22c55e]/15 border-[#22c55e]/60 text-[#22c55e]'
+                : t.cancelled
+                  ? 'bg-[#f59e0b]/10 border-[#f59e0b]/50 text-[#f59e0b] hover:border-[#6366f1]'
+                  : 'border-[#333] hover:border-[#6366f1]'"
+              :title="t.done ? 'Mark as not done' : t.cancelled ? 'Cancelled. Click to mark as done' : 'Mark as done'"
               @click="toggleDone(t)"
             >
               <CheckIcon v-if="t.done" :size="13" :stroke-width="3" />
+              <XIcon v-else-if="t.cancelled" :size="13" :stroke-width="3" />
             </button>
 
             <div class="flex-1 min-w-0">
               <div
                 class="text-sm break-words"
-                :class="!t.text ? 'italic text-[#555]' : t.done ? 'line-through text-[#555]' : 'text-[#ddd]'"
+                :class="!t.text ? 'italic text-[#555]' : t.done || t.cancelled ? 'line-through text-[#555]' : 'text-[#ddd]'"
               >
                 {{ t.text || 'Empty line' }}
               </div>
 
               <!-- Small facts about the task -->
               <div
-                v-if="isPending(t) || t.movedFrom || t.done"
+                v-if="isPending(t) || t.cancelled || t.movedFrom || t.done"
                 class="text-2xs mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
               >
                 <span v-if="isPending(t)" class="text-[#ef4444]">Not done</span>
+                <span v-if="t.cancelled" class="text-[#f59e0b]">Cancelled</span>
                 <span v-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
                 <span v-if="t.done" class="text-[#22c55e]/80">{{ tookLabel(t) }}</span>
               </div>
 
-              <!-- Buttons: move a task that is not done, and open its note -->
+              <!-- Buttons: move or cancel a task that is not done, and open its note -->
               <div
                 v-if="!selecting && (!t.done || t.docId)"
                 class="flex flex-wrap items-center gap-1.5 mt-1.5"
                 :class="{ 'opacity-50 pointer-events-none': busyId === t.id }"
               >
-                <template v-if="!t.done">
+                <button
+                  v-if="t.cancelled"
+                  class="btn btn-sm"
+                  title="Make it a task to do again"
+                  @click="setCancelled(t, false)"
+                >
+                  Undo cancel
+                </button>
+                <template v-else-if="!t.done">
                   <button v-if="isPending(t)" class="btn btn-sm btn-accent" @click="moveTo(t, today)">Move to today</button>
                   <button v-else class="btn btn-sm" title="Move to the next day" @click="moveTo(t, addDays(t.day, 1))">Next day</button>
                   <button class="btn btn-sm" title="Move to another day" @click="openDatePick(t)">Pick a date</button>
+                  <button
+                    class="btn btn-sm"
+                    title="You decided not to do it. It stays in your history."
+                    @click="setCancelled(t, true)"
+                  >
+                    Cancel task
+                  </button>
                 </template>
                 <a
                   v-if="t.docId"

@@ -1,6 +1,6 @@
 import type { Task } from '~/types/tasks'
 
-// Pending tasks = their day is over (after midnight) and they are still not done.
+// Pending tasks = their day is over (after midnight) and they are still not done (and not cancelled).
 // The list is shared by the header button, the phone menu and the popup.
 export function usePendingTasks() {
   const pending = useState<Task[]>('pending-tasks', () => [])
@@ -27,7 +27,13 @@ export function usePendingTasks() {
   }
 
   async function markDone(id: string) {
-    await $fetch(`/api/tasks/${id}`, { method: 'PUT', body: { done: true } })
+    await $fetch(`/api/tasks/${id}`, { method: 'PUT', body: { done: true, doneDay: todayKey() } })
+    await tasksChanged()
+  }
+
+  /** The person decided not to do it: it leaves the pending list but stays in the history. */
+  async function cancelTask(id: string) {
+    await $fetch(`/api/tasks/${id}`, { method: 'PUT', body: { cancelled: true } })
     await tasksChanged()
   }
 
@@ -65,6 +71,7 @@ export function usePendingTasks() {
     refreshPending,
     tasksChanged,
     markDone,
+    cancelTask,
     moveToToday,
     removeTask,
     popupShownToday,

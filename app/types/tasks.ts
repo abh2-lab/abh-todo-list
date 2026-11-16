@@ -5,6 +5,10 @@ export interface Task {
   day: string
   done: boolean
   doneAt: string | null
+  /** The day it was done, like 2026-11-12. Empty for tasks done before this was saved (then use doneAt). */
+  doneDay: string | null
+  /** The person decided not to do it (never pending, never done). */
+  cancelled: boolean
   /** If it was moved: the first day it was planned for. */
   movedFrom: string | null
   /** The note the task line is in (made with the "Today's task" button). */
@@ -21,7 +25,7 @@ export interface TaskShare {
   createdAt: string
 }
 
-/** What the share page gets: only the task text, its day and whether it is done. */
+/** What the share page gets: only the task text, its day, done or cancelled, and the day it was done. */
 export interface SharedTasks {
   /** First name of the owner (null if we don't know it). */
   name: string | null
@@ -34,5 +38,8 @@ export interface SharedTask {
   text: string
   day: string
   done: boolean
+  cancelled: boolean
   movedFrom: string | null
+  /** The day it was done (only for done tasks). */
+  doneDay: string | null
 }

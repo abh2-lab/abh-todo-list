@@ -48,16 +48,13 @@ const byDay = computed(() => {
   return map
 })
 const dayTasks = computed(() => byDay.value.get(selected.value) ?? [])
-const dayDone = computed(() => dayTasks.value.filter((t) => t.done).length)
 
 /** All tasks, month by month, day by day. */
 const allByMonth = computed(() => months.value.map((month) => {
   const days = [...byDay.value.entries()]
     .filter(([day]) => day.startsWith(month))
-    .map(([day, list]) => ({ day, list, done: list.filter((t) => t.done).length }))
-  const total = days.reduce((n, d) => n + d.list.length, 0)
-  const done = days.reduce((n, d) => n + d.done, 0)
-  return { month, days, total, done }
+    .map(([day, list]) => ({ day, list }))
+  return { month, days, all: days.flatMap((d) => d.list) }
 }))
 
 function showMonth(key: string) {
@@ -218,7 +215,7 @@ function retry() {
             <span v-if="selected === today" class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
           </div>
           <div class="text-xs text-[#555] mt-0.5">
-            {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day.' }}
+            {{ dayTasks.length ? doneText(dayTasks) : 'No tasks for this day.' }}
           </div>
           <ul class="mt-3">
             <TasksSharedTaskItem v-for="(t, i) in dayTasks" :key="i" :task="t" :today="today" />
@@ -232,7 +229,7 @@ function retry() {
           <div class="flex items-baseline gap-3 border-b border-[#1f1f1f] pb-2">
             <h2 class="text-sm font-medium text-[#e0e0e0]">{{ monthName(m.month, 'long') }}</h2>
             <span class="text-xs text-[#555]">
-              {{ m.total ? `${m.done} of ${m.total} done` : 'No tasks' }}
+              {{ m.all.length ? doneText(m.all) : 'No tasks' }}
             </span>
           </div>
           <div v-for="d in m.days" :key="d.day" class="mt-4">
@@ -243,7 +240,7 @@ function retry() {
             >
               {{ longDay(d.day) }}
             </button>
-            <span class="ml-2 text-2xs text-[#555]">{{ d.done }} of {{ d.list.length }} done</span>
+            <span class="ml-2 text-2xs text-[#555]">{{ doneText(d.list) }}</span>
             <ul class="mt-1">
               <TasksSharedTaskItem v-for="(t, i) in d.list" :key="i" :task="t" :today="today" />
             </ul>

@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { useDb } from '../../db'
 import { tasks } from '../../../db/schema'
 
-// Many tasks at once: { ids: [...], action: 'done' | 'delete' }
+// Many tasks at once: { ids: [...], action: 'done' | 'cancel' | 'delete', doneDay? }
 // Delete only takes tasks off the list. Their lines stay in the notes as normal text.
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
@@ -18,8 +18,18 @@ export default defineEventHandler(async (event) => {
     const now = new Date()
     const rows = await db
       .update(tasks)
-      .set({ done: true, doneAt: now, updatedAt: now })
+      .set({ done: true, doneAt: now, doneDay: readDoneDay(body.doneDay), cancelled: false, updatedAt: now })
       .where(and(mine, eq(tasks.done, false)))
+      .returning({ id: tasks.id })
+    return { count: rows.length }
+  }
+
+  // Cancel: only tasks that are not done.
+  if (body.action === 'cancel') {
+    const rows = await db
+      .update(tasks)
+      .set({ cancelled: true, updatedAt: new Date() })
+      .where(and(mine, eq(tasks.done, false), eq(tasks.cancelled, false)))
       .returning({ id: tasks.id })
     return { count: rows.length }
   }
@@ -29,5 +39,5 @@ export default defineEventHandler(async (event) => {
     return { count: rows.length }
   }
 
-  throw createError({ statusCode: 400, message: 'action must be "done" or "delete"' })
+  throw createError({ statusCode: 400, message: 'action must be "done", "cancel" or "delete"' })
 })

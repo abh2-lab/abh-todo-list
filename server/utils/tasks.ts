@@ -10,6 +10,8 @@ export const taskColumns = {
   day: tasks.day,
   done: tasks.done,
   doneAt: tasks.doneAt,
+  doneDay: tasks.doneDay,
+  cancelled: tasks.cancelled,
   movedFrom: tasks.movedFrom,
   docId: tasks.docId,
   createdAt: tasks.createdAt,
@@ -27,6 +29,14 @@ export function readDay(value: unknown, name = 'day'): string {
     throw createError({ statusCode: 400, message: `${name} must be a day like 2026-11-09` })
   }
   return s
+}
+
+/**
+ * The day a task was done, like 2026-11-12. The browser sends it (its own time, like "today").
+ * A browser with the old app still open doesn't: then it is today in UTC.
+ */
+export function readDoneDay(value: unknown): string {
+  return value === undefined ? new Date().toISOString().slice(0, 10) : readDay(value, 'doneDay')
 }
 
 export function readTaskText(value: unknown): string {
