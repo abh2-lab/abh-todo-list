@@ -145,7 +145,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
             <h3 class="text-sm font-medium text-[#f0f0f0]">Share your Daily tasks</h3>
             <p class="text-xs text-[#777] mt-1.5 leading-relaxed">
               Anyone with the link can see your tasks of the months you pick: the task, its day, whether it is
-              done or cancelled, and the day it was done. They can't change anything, and they don't see your notes.
+              done or cancelled, and the day it was done. They can also see an analytics page with numbers and
+              charts of these tasks. They can't change anything, and they don't see your notes.
             </p>
 
             <!-- Pick the months -->

@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import type { SharedTask, SharedTasks } from '~/types/tasks'
+import { ChartColumnIcon } from '@lucide/vue'
+import type { SharedTask } from '~/types/tasks'
 
 // The page behind a Daily tasks share link: someone's tasks of some months, view only.
 // Pick a month and click a day to see its tasks, or see all of them in one list.
+// "See analytics" opens the numbers and charts of the same tasks.
 // It loads again every minute (and when you come back to the tab), so new tasks and ticks show up.
 const route = useRoute()
 const id = String(route.params.id ?? '')
 
-const data = ref<SharedTasks | null>(null)
-const failed = ref<'gone' | 'network' | null>(null)
-const loading = ref(true)
+const { data, failed, loading, today, months, retry } = useSharedTasks(id, (res) => {
+  // Start on today when it is in the shared months; otherwise on the first shared month.
+  const start = inRange(today.value) ? today.value : `${res.from}-01`
+  selected.value = start
+  showMonth(start.slice(0, 7))
+})
 
-const today = ref(todayKey())
 const tab = ref<'calendar' | 'list'>('calendar')
 const shown = ref({ year: new Date().getFullYear(), month: new Date().getMonth() })
 const selected = ref(today.value)
@@ -25,14 +29,6 @@ useHead(() => ({
   // A private link: search engines should not list it.
   meta: [{ name: 'robots', content: 'noindex, nofollow' }],
 }))
-
-/** The shared months, like ["2026-09", "2026-10", …]. */
-const months = computed(() => {
-  if (!data.value) return []
-  const [y, m] = data.value.from.split('-').map(Number)
-  return Array.from({ length: monthCount(data.value.from, data.value.to) }, (_, i) =>
-    toMonthKey(new Date(y!, m! - 1 + i, 1)))
-})
 
 const inRange = (day: string) => !!data.value && day.slice(0, 7) >= data.value.from && day.slice(0, 7) <= data.value.to
 const todayInRange = computed(() => inRange(today.value))
@@ -83,54 +79,6 @@ function goToday() {
 function openDay(day: string) {
   tab.value = 'calendar'
   pickDay(day)
-}
-
-async function load(first = false) {
-  try {
-    const res = await $fetch<SharedTasks>(`/api/shared-tasks/${encodeURIComponent(id)}`)
-    data.value = res
-    failed.value = null
-    if (first) {
-      // Start on today when it is in the shared months; otherwise on the first shared month.
-      const start = inRange(today.value) ? today.value : `${res.from}-01`
-      selected.value = start
-      showMonth(start.slice(0, 7))
-    }
-  } catch (e) {
-    if (errorStatus(e) === 404) {
-      data.value = null
-      failed.value = 'gone'
-    } else if (!data.value) {
-      failed.value = 'network'
-    }
-  } finally {
-    loading.value = false
-  }
-}
-
-let timer: ReturnType<typeof setInterval> | null = null
-function onVisible() {
-  if (document.visibilityState !== 'visible') return
-  today.value = todayKey()
-  void load()
-}
-onMounted(() => {
-  void load(true)
-  timer = setInterval(() => {
-    today.value = todayKey()
-    if (document.visibilityState === 'visible' && failed.value !== 'gone') void load()
-  }, 60_000)
-  document.addEventListener('visibilitychange', onVisible)
-})
-onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
-  document.removeEventListener('visibilitychange', onVisible)
-})
-
-function retry() {
-  loading.value = true
-  failed.value = null
-  void load(true)
 }
 </script>
 
@@ -190,6 +138,10 @@ function retry() {
             {{ monthName(m) }}
           </button>
         </div>
+        <NuxtLink :to="`/shared/tasks/${encodeURIComponent(id)}/analytics`" class="btn btn-accent ml-auto">
+          <ChartColumnIcon :size="15" />
+          See analytics
+        </NuxtLink>
       </div>
 
       <!-- Calendar: click a day to see its tasks -->
