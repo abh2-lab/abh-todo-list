@@ -38,11 +38,6 @@ function isPending(t: Task) {
   return taskState(t, today.value) === 'late'
 }
 
-function tookLabel(t: Task) {
-  const n = tookDays(t)
-  return n === null ? '' : `took ${n} ${n === 1 ? 'day' : 'days'}`
-}
-
 /** "Open note" opens the note in a new tab, at the task's line. */
 function noteLink(t: Task) {
   return `/?doc=${encodeURIComponent(t.docId!)}&task=${encodeURIComponent(t.id)}`
@@ -405,15 +400,15 @@ watch(selected, () => {
                 {{ t.text || 'Empty line' }}
               </div>
 
-              <!-- Small facts about the task -->
+              <!-- Small facts about the task. "Completed in 3 days (10 Nov → 12 Nov)" already says the first day. -->
               <div
-                v-if="isPending(t) || t.cancelled || t.movedFrom || t.done"
+                v-if="isPending(t) || t.cancelled || t.movedFrom || completedText(t)"
                 class="text-2xs mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
               >
                 <span v-if="isPending(t)" class="text-[#ef4444]">Not done</span>
                 <span v-if="t.cancelled" class="text-[#f59e0b]">Cancelled</span>
-                <span v-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
-                <span v-if="t.done" class="text-[#22c55e]/80">{{ tookLabel(t) }}</span>
+                <span v-if="completedText(t)" class="text-[#22c55e]/80">{{ completedText(t) }}</span>
+                <span v-else-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
               </div>
 
               <!-- Buttons: move or cancel a task that is not done, and open its note -->

@@ -52,11 +52,42 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((fromDayKey(to).getTime() - fromDayKey(from).getTime()) / 86_400_000)
 }
 
-/** A done task took this many days: from its first planned day to the day it was done (1 = same day). */
-export function tookDays(task: { day: string; movedFrom: string | null; doneAt: string | null }): number | null {
-  if (!task.doneAt) return null
-  const start = task.movedFrom ?? task.day
-  return Math.max(1, daysBetween(start, toDayKey(new Date(task.doneAt))) + 1)
+/** "6 Nov": the day and the month only. */
+export function dayMonth(key: string): string {
+  return fromDayKey(key).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+interface DoneTask {
+  day: string
+  movedFrom: string | null
+  doneDay?: string | null
+  doneAt?: string | null
+}
+
+/** The day a task was done, like 2026-11-12 (null if it is not done). */
+export function doneDayOf(task: Pick<DoneTask, 'doneDay' | 'doneAt'>): string | null {
+  // Tasks done before the day was saved: the day of the time it was done, in this computer's time.
+  return task.doneDay ?? (task.doneAt ? toDayKey(new Date(task.doneAt)) : null)
+}
+
+/**
+ * A done task took this many days: from its first planned day to the day it was done,
+ * both days counted (1 = done on its planned day). Null if it is not done.
+ */
+export function tookDays(task: DoneTask): number | null {
+  const end = doneDayOf(task)
+  if (!end) return null
+  return Math.max(1, daysBetween(task.movedFrom ?? task.day, end) + 1)
+}
+
+/**
+ * A task done on a later day than first planned: "Completed in 3 days (10 Nov → 12 Nov)".
+ * Empty for a task done on its planned day, and for a task that is not done.
+ */
+export function completedText(task: DoneTask): string {
+  const n = tookDays(task)
+  if (!n || n < 2) return ''
+  return `Completed in ${n} days (${dayMonth(task.movedFrom ?? task.day)} → ${dayMonth(doneDayOf(task)!)})`
 }
 
 // ---- Months, like "2026-09" (share links of Daily tasks) ----

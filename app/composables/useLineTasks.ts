@@ -24,6 +24,7 @@ function sameTasks(a: Map<string, LineTask>, b: Map<string, LineTask>) {
   for (const [id, t] of a) {
     const o = b.get(id)
     if (!o || o.done !== t.done || o.day !== t.day || !!o.cancelled !== !!t.cancelled) return false
+    if ((o.took ?? null) !== (t.took ?? null)) return false
   }
   return true
 }
@@ -115,7 +116,7 @@ export function useLineTasks(
     if (n !== loadsStarted || e.isDestroyed || opts.docId() !== docId || !opts.enabled()) return
 
     const map = new Map<string, LineTask>()
-    for (const r of rows) map.set(r.id, { done: r.done, day: r.day, cancelled: r.cancelled })
+    for (const r of rows) map.set(r.id, { done: r.done, day: r.day, cancelled: r.cancelled, took: r.done ? tookDays(r) : null })
     for (const [id, o] of local) {
       if (o.settled !== null && n > o.settled) local.delete(id)
       else map.set(id, o.task)
@@ -164,7 +165,7 @@ export function useLineTasks(
     const e = editor.value
     const now = e ? storageOf(e).tasks.get(id) : undefined
     // Ticked = done (that takes the cancel off). Unticked = not done.
-    const tracked = track(id, { day: now?.day ?? todayKey(), done, cancelled: done ? false : now?.cancelled })
+    const tracked = track(id, { day: now?.day ?? todayKey(), done, cancelled: done ? false : now?.cancelled, took: null })
     const run = async () => {
       try {
         await $fetch(`/api/tasks/${id}`, { method: 'PUT', body: done ? { done, doneDay: todayKey() } : { done } })

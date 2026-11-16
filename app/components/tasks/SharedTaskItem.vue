@@ -10,6 +10,8 @@ const props = defineProps<{
 
 const state = computed(() => taskState(props.task, props.today))
 const stateName = computed(() => ({ done: 'Done', cancelled: 'Cancelled', late: 'Not done', todo: 'Not done yet' })[state.value])
+// "Completed in 3 days (10 Nov → 12 Nov)" for a task done on a later day than planned
+const completed = computed(() => completedText(props.task))
 </script>
 
 <template>
@@ -37,12 +39,13 @@ const stateName = computed(() => ({ done: 'Done', cancelled: 'Cancelled', late: 
         {{ task.text || 'Empty line' }}
       </div>
       <div
-        v-if="state === 'late' || state === 'cancelled' || task.movedFrom"
+        v-if="state === 'late' || state === 'cancelled' || task.movedFrom || completed"
         class="text-2xs mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
       >
         <span v-if="state === 'late'" class="text-[#ef4444]">Not done</span>
         <span v-if="state === 'cancelled'" class="text-[#f59e0b]">Cancelled</span>
-        <span v-if="task.movedFrom" class="text-[#555]">from {{ shortDay(task.movedFrom) }}</span>
+        <span v-if="completed" class="text-[#22c55e]/80">{{ completed }}</span>
+        <span v-else-if="task.movedFrom" class="text-[#555]">from {{ shortDay(task.movedFrom) }}</span>
       </div>
     </div>
   </li>

@@ -23,6 +23,8 @@ export interface LineTask {
   day: string
   /** The person decided not to do it. */
   cancelled?: boolean
+  /** A done task took this many days (2 or more: the tag says "done in 3 days"). */
+  took?: number | null
 }
 
 export interface TaskLinesStorage {
@@ -139,7 +141,7 @@ function buildTags(doc: PMNode, storage: TaskLinesStorage): DecorationSet {
       ? 'done'
       : task.cancelled ? 'cancelled' : task.day < today ? 'late' : task.day === today ? 'today' : 'later'
     const tag = state === 'done'
-      ? 'Task · done'
+      ? (task.took && task.took > 1 ? `Task · done in ${task.took} days` : 'Task · done')
       : state === 'cancelled'
         ? 'Task · cancelled'
         : state === 'late'
@@ -349,8 +351,8 @@ export const TaskLines = Extension.create<object, TaskLinesStorage>({
     for (const [id, ticked] of after) {
       const task = storage.tasks.get(id)
       if (!task || !before.has(id) || before.get(id) === ticked) continue
-      // Ticked = done, and done takes the cancel off.
-      storage.tasks.set(id, { ...task, done: ticked, cancelled: ticked ? false : task.cancelled })
+      // Ticked = done, and done takes the cancel off. How many days it took comes with the next load.
+      storage.tasks.set(id, { ...task, done: ticked, cancelled: ticked ? false : task.cancelled, took: null })
       changed = true
       storage.onCheck?.(id, ticked)
     }
