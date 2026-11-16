@@ -56,7 +56,7 @@ function handleDelete(id: string) {
         All Notes
       </span>
       <button
-        class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#777] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors"
+        class="flex items-center gap-1.5 text-btn px-2.5 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#777] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors"
         :title="loggedIn ? 'New private note (named with today\'s date)' : 'New document'"
         @click="emit('new-doc', { private: true })"
       >
@@ -85,7 +85,7 @@ function handleDelete(id: string) {
     <template v-else>
       <!-- My notes -->
       <div class="flex-1 min-h-0 overflow-y-auto py-1.5">
-        <div class="pl-4 pr-3 pt-3 pb-1.5 text-[11px] text-[#555] select-none">
+        <div class="pl-4 pr-3 pt-3 pb-1.5 text-2xs text-[#555] select-none">
           <span class="font-semibold uppercase tracking-wider">My notes</span>
           <span class="text-[#333]"> · only you</span>
         </div>
@@ -109,7 +109,7 @@ function handleDelete(id: string) {
       >
         <div class="flex items-center gap-1 pl-2 pr-3 py-1.5 shrink-0">
           <button
-            class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-left text-[11px] text-[#555] hover:text-[#999] hover:bg-[#0d0d0d] transition-colors select-none"
+            class="flex-1 min-w-0 flex items-center gap-1.5 px-2 py-1.5 rounded text-left text-2xs text-[#555] hover:text-[#999] hover:bg-[#0d0d0d] transition-colors select-none"
             :aria-expanded="publicOpen"
             :title="publicOpen ? 'Hide public notes' : 'Show public notes'"
             @click="publicOpen = !publicOpen"

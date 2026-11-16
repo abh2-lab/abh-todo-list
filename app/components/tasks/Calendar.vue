@@ -150,7 +150,7 @@ onBeforeUnmount(() => dotObserver?.disconnect())
     </div>
 
     <div ref="gridEl" class="grid grid-cols-7 gap-1">
-      <div v-for="w in weekdays" :key="w" class="text-[11px] text-[#444] text-center pb-1 select-none">{{ w }}</div>
+      <div v-for="w in weekdays" :key="w" class="text-2xs text-[#444] text-center pb-1 select-none">{{ w }}</div>
       <button
         v-for="key in grid"
         :key="key"
@@ -190,7 +190,7 @@ onBeforeUnmount(() => dotObserver?.disconnect())
       </button>
     </div>
 
-    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-[#555] select-none">
+    <div class="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-2xs text-[#555] select-none">
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />Done</span>
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />Not done (day is over)</span>
       <span class="flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-[#4a4a4a]" />Not done yet</span>

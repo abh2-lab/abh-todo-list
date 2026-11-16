@@ -289,7 +289,7 @@ watch(selected, () => {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <h3 class="text-sm font-medium text-[#e0e0e0]">{{ longDay(selected) }}</h3>
-              <span v-if="selected === today" class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
+              <span v-if="selected === today" class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
             </div>
             <div class="text-xs text-[#555] mt-0.5">
               {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day.' }}
@@ -301,7 +301,7 @@ watch(selected, () => {
         <!-- Select many -->
         <div v-if="selecting" class="flex flex-wrap items-center gap-1.5 mt-3 p-2 rounded-lg border border-[#1f1f1f] bg-[#0b0b0b]">
           <button class="btn btn-sm" @click="togglePickAll">{{ allPicked ? 'Select none' : 'Select all' }}</button>
-          <span class="text-[11px] text-[#666] px-1">{{ pickedTasks.length }} selected</span>
+          <span class="text-2xs text-[#666] px-1">{{ pickedTasks.length }} selected</span>
           <div class="flex-1" />
           <button
             class="btn btn-sm btn-accent"
@@ -374,7 +374,7 @@ watch(selected, () => {
               <!-- Small facts about the task -->
               <div
                 v-if="isPending(t) || t.movedFrom || t.done"
-                class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
+                class="text-2xs mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5"
               >
                 <span v-if="isPending(t)" class="text-[#ef4444]">Not done</span>
                 <span v-if="t.movedFrom" class="text-[#555]">from {{ shortDay(t.movedFrom) }}</span>
@@ -431,7 +431,7 @@ watch(selected, () => {
           </li>
         </ul>
 
-        <p v-if="selected === today && dayTasks.length && !selecting" class="mt-3 pt-3 border-t border-[#141414] text-[11px] text-[#444]">
+        <p v-if="selected === today && dayTasks.length && !selecting" class="mt-3 pt-3 border-t border-[#141414] text-2xs text-[#444]">
           Add more from your notes with the <span class="text-[#818cf8]">Today's task</span> button.
         </p>
       </section>

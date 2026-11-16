@@ -293,8 +293,8 @@ const buttons = computed<BtnDef[]>(() => {
           @keydown.escape="showYoutubeModal = false"
         />
         <div class="flex justify-end gap-2 mt-3">
-          <button class="text-xs text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showYoutubeModal = false">Cancel</button>
-          <button class="text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="insertYoutube">Insert</button>
+          <button class="text-btn text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showYoutubeModal = false">Cancel</button>
+          <button class="text-btn bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="insertYoutube">Insert</button>
         </div>
       </div>
     </div>
@@ -318,8 +318,8 @@ const buttons = computed<BtnDef[]>(() => {
           @keydown.escape="showLinkModal = false"
         />
         <div class="flex justify-end gap-2 mt-3">
-          <button class="text-xs text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showLinkModal = false">Cancel</button>
-          <button class="text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="applyLink">Apply</button>
+          <button class="text-btn text-[#666] hover:text-[#999] px-3 py-1.5 rounded" @click="showLinkModal = false">Cancel</button>
+          <button class="text-btn bg-[#6366f1] hover:bg-[#4f46e5] text-white px-3 py-1.5 rounded transition-colors" @click="applyLink">Apply</button>
         </div>
       </div>
     </div>

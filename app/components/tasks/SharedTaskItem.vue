@@ -28,7 +28,7 @@ const overdue = computed(() => !props.task.done && props.task.day < props.today)
       >
         {{ task.text || 'Empty line' }}
       </div>
-      <div v-if="overdue || task.movedFrom" class="text-[11px] mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <div v-if="overdue || task.movedFrom" class="text-2xs mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
         <span v-if="overdue" class="text-[#ef4444]">Not done</span>
         <span v-if="task.movedFrom" class="text-[#555]">from {{ shortDay(task.movedFrom) }}</span>
       </div>

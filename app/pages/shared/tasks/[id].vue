@@ -142,7 +142,7 @@ function retry() {
     <header class="border-b border-[#1f1f1f] px-4 sm:px-6 py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
       <h1 class="text-base text-[#f0f0f0]">{{ title }}</h1>
       <span v-if="data" class="text-xs text-[#777]">{{ rangeText }}</span>
-      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium">
+      <span class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium">
         View only
       </span>
     </header>
@@ -215,7 +215,7 @@ function retry() {
         <section class="lg:flex-1 min-w-0 w-full self-start rounded-xl border border-[#1f1f1f] bg-[#080808] p-4">
           <div class="flex items-center gap-2">
             <h3 class="text-sm font-medium text-[#e0e0e0]">{{ longDay(selected) }}</h3>
-            <span v-if="selected === today" class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
+            <span v-if="selected === today" class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#818cf8] border border-[#6366f1]/30">Today</span>
           </div>
           <div class="text-xs text-[#555] mt-0.5">
             {{ dayTasks.length ? `${dayDone} of ${dayTasks.length} done` : 'No tasks for this day.' }}
@@ -243,7 +243,7 @@ function retry() {
             >
               {{ longDay(d.day) }}
             </button>
-            <span class="ml-2 text-[11px] text-[#555]">{{ d.done }} of {{ d.list.length }} done</span>
+            <span class="ml-2 text-2xs text-[#555]">{{ d.done }} of {{ d.list.length }} done</span>
             <ul class="mt-1">
               <TasksSharedTaskItem v-for="(t, i) in d.list" :key="i" :task="t" :today="today" />
             </ul>

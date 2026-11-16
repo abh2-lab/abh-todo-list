@@ -54,7 +54,7 @@ function formatDate(d: string) {
       <div class="flex items-center gap-3">
         <NuxtLink
           to="/"
-          class="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-[#999] transition-colors"
+          class="flex items-center gap-1.5 text-2xs text-[#555] hover:text-[#999] transition-colors"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
             <path d="M6.5 1.5L3 5l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -66,12 +66,12 @@ function formatDate(d: string) {
 
         <span class="text-sm text-[#888] truncate max-w-xs">{{ doc?.title || 'Untitled' }}</span>
 
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium">
+        <span class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium">
           View only
         </span>
       </div>
 
-      <span v-if="doc" class="text-[11px] text-[#333]">
+      <span v-if="doc" class="text-2xs text-[#333]">
         Last edited {{ formatDate(doc.updatedAt) }}
       </span>
     </header>

@@ -141,14 +141,14 @@ onBeforeUnmount(() => {
         :class="boxPos ? '' : 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'"
         :style="boxPos ? { top: `${boxPos.top}px`, left: `${boxPos.left}px` } : undefined"
       >
-        <div class="text-[13px] text-[#666]">{{ index + 1 }} of {{ steps.length }}</div>
+        <div class="text-xs text-[#666]">{{ index + 1 }} of {{ steps.length }}</div>
         <h3 id="tour-title" class="mt-1 text-base font-medium text-[#f0f0f0]">{{ current.title }}</h3>
         <p id="tour-text" class="mt-2 text-sm leading-relaxed text-[#aaa]">{{ current.text }}</p>
         <div class="mt-5 flex items-center gap-2">
-          <button v-if="!isLast" type="button" class="btn btn-ghost text-[13px] -ml-3" @click="close">Skip tour</button>
+          <button v-if="!isLast" type="button" class="btn btn-ghost -ml-3" @click="close">Skip tour</button>
           <span class="flex-1" />
-          <button v-if="index > 0" type="button" class="btn text-[13px]" @click="back">Back</button>
-          <button ref="nextBtn" type="button" class="btn btn-accent text-[13px]" @click="next">
+          <button v-if="index > 0" type="button" class="btn" @click="back">Back</button>
+          <button ref="nextBtn" type="button" class="btn btn-accent" @click="next">
             {{ isLast ? 'Done' : 'Next' }}
           </button>
         </div>

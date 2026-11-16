@@ -84,7 +84,7 @@ function jumpToHeading(pos: number) {
         {{ doc?.title || 'Untitled' }}
       </span>
 
-      <span class="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium shrink-0">
+      <span class="text-2xs px-1.5 py-0.5 rounded bg-[#1a1a2e] text-[#6366f1] border border-[#6366f1]/30 font-medium shrink-0">
         View
       </span>
     </header>

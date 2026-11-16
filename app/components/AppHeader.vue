@@ -114,24 +114,34 @@ function onTitleKeydown(e: KeyboardEvent) {
       @open-pending="emit('open-pending')"
     />
 
-    <!-- Right: same as before (only on the Notes page) -->
+    <!-- Right: only on the Notes page. The button names show on wide screens (xl); on smaller
+         screens there is no room next to the middle part, so only the icons show. -->
     <div class="flex items-center justify-end gap-2.5 min-w-0">
       <template v-if="view === 'notes'">
         <div
-          class="shrink-0 text-xs transition-all duration-300 min-w-[40px] text-right"
+          class="shrink-0 text-xs transition-all duration-300 md:min-w-[40px] text-right"
           :class="{
             'text-[#6366f1]': saveStatus === 'saving',
             'text-[#3a3a3a]': saveStatus === 'unsaved',
             'text-[#1f1f1f]': saveStatus === 'saved',
           }"
         >
-          <span v-if="saveStatus === 'saving'" class="animate-pulse">Saving…</span>
-          <span v-else-if="saveStatus === 'unsaved'">Unsaved</span>
+          <!-- Small screens: a dot (as on phones). Bigger screens: the words. -->
+          <template v-if="saveStatus !== 'saved'">
+            <span
+              class="md:hidden block w-1.5 h-1.5 rounded-full bg-current"
+              :class="{ 'animate-pulse': saveStatus === 'saving' }"
+              :title="saveStatus === 'saving' ? 'Saving…' : 'Unsaved'"
+            />
+            <span class="hidden md:inline" :class="{ 'animate-pulse': saveStatus === 'saving' }">
+              {{ saveStatus === 'saving' ? 'Saving…' : 'Unsaved' }}
+            </span>
+          </template>
         </div>
 
         <button
           data-tour="view-mode"
-          class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border transition-colors shrink-0"
+          class="flex items-center gap-1.5 text-btn px-3 py-1.5 rounded border transition-colors shrink-0"
           :class="viewMode
             ? 'bg-[#6366f1]/10 border-[#6366f1]/30 text-[#818cf8] hover:bg-[#6366f1]/20'
             : 'bg-[#111] border-[#1f1f1f] text-[#888] hover:text-[#f0f0f0] hover:bg-[#1a1a1a]'"
@@ -145,7 +155,7 @@ function onTitleKeydown(e: KeyboardEvent) {
           <svg v-else width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M9 1.5l1.5 1.5-7 7L2 10.5l.5-1.5 7-7z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
-          <span class="hidden lg:inline">{{ viewMode ? 'Edit' : 'View' }}</span>
+          <span class="hidden xl:inline">{{ viewMode ? 'Edit' : 'View' }}</span>
         </button>
 
         <ShareButton
@@ -157,7 +167,7 @@ function onTitleKeydown(e: KeyboardEvent) {
         />
 
         <button
-          class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#888] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors shrink-0"
+          class="flex items-center gap-1.5 text-btn px-3 py-1.5 rounded bg-[#111] hover:bg-[#1a1a1a] text-[#888] hover:text-[#f0f0f0] border border-[#1f1f1f] transition-colors shrink-0"
           data-tour="new-note"
           title="New document"
           @click="emit('new-doc')"
@@ -165,7 +175,7 @@ function onTitleKeydown(e: KeyboardEvent) {
           <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
             <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          <span class="hidden lg:inline">New</span>
+          <span class="hidden xl:inline">New</span>
         </button>
       </template>
     </div>

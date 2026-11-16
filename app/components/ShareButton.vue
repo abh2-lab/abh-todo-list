@@ -54,7 +54,7 @@ function stopSharing() {
     <button
       :class="compact
         ? ['flex items-center justify-center w-9 h-9 rounded transition-colors', copied ? 'bg-emerald-900/20 text-emerald-400' : 'text-[#999] hover:bg-[#1a1a1a]']
-        : ['flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border transition-colors', copied
+        : ['flex items-center gap-1.5 text-btn px-3 py-1.5 rounded border transition-colors', copied
           ? 'bg-emerald-900/20 border-emerald-700/30 text-emerald-400'
           : 'bg-[#111] border-[#1f1f1f] text-[#888] hover:text-[#f0f0f0] hover:bg-[#1a1a1a]']"
       :title="isPrivate ? 'Share this private note' : 'Copy shareable view link'"
@@ -67,7 +67,7 @@ function stopSharing() {
       <svg v-else :width="compact ? 14 : 12" :height="compact ? 14 : 12" viewBox="0 0 12 12" fill="none">
         <path d="M1.5 6l3.5 3.5 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span v-if="!compact" class="hidden lg:inline">{{ copied ? 'Copied!' : 'Share' }}</span>
+      <span v-if="!compact" class="hidden xl:inline">{{ copied ? 'Copied!' : 'Share' }}</span>
     </button>
 
     <div v-if="menuOpen" class="menu-panel absolute right-0 top-full mt-2 z-50 w-64 text-left">

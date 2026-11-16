@@ -26,7 +26,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
       <!-- Logged-in person: click for the Log out menu -->
       <div ref="menuRoot" class="relative shrink-0">
         <button
-          class="nav-btn"
+          class="nav-btn max-md:px-2"
           :class="{ 'nav-btn-active': menuOpen }"
           :title="`Logged in as ${user.email}`"
           @click="menuOpen = !menuOpen"
@@ -50,7 +50,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
       <div class="w-px h-5 bg-[#1f1f1f] mx-1 shrink-0" />
 
       <button
-        class="nav-btn"
+        class="nav-btn max-md:px-2"
         :class="{ 'nav-btn-active': view === 'notes' }"
         title="Notes"
         @click="emit('update:view', 'notes')"
@@ -63,7 +63,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
       </button>
 
       <button
-        class="nav-btn"
+        class="nav-btn max-md:px-2"
         :class="{ 'nav-btn-active': view === 'tasks' }"
         data-tour="nav-tasks"
         title="Daily tasks"
@@ -77,7 +77,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
       </button>
 
       <button
-        class="nav-btn"
+        class="nav-btn max-md:px-2"
         data-tour="nav-pending"
         :title="pendingCount ? `${pendingCount} pending ${pendingCount === 1 ? 'task' : 'tasks'}` : 'No pending tasks'"
         @click="emit('open-pending')"
@@ -92,14 +92,14 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
     </template>
 
     <template v-else>
-      <span class="nav-btn nav-btn-active cursor-default" title="Notes">
+      <span class="nav-btn nav-btn-active max-md:px-2 cursor-default" title="Notes">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M2.5 2h6l3 3v7h-9V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           <path d="M8.5 2v3h3M4.5 7.5h5M4.5 9.75h3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span class="hidden lg:inline">Notes</span>
       </span>
-      <a :href="loginUrl" class="btn btn-accent h-8" data-tour="login" title="Login with Google to keep private notes and daily tasks">
+      <a :href="loginUrl" class="btn btn-accent h-9" data-tour="login" title="Login with Google to keep private notes and daily tasks">
         <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
           <path d="M8.5 2.5h2.25a1 1 0 011 1v7a1 1 0 01-1 1H8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           <path d="M2 7h6.5M6 4.5L8.5 7 6 9.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -109,7 +109,7 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
     </template>
 
     <!-- Help: a short tour of the app -->
-    <button class="nav-btn" data-tour="help" title="Help: a short tour of the app" @click="startTour">
+    <button class="nav-btn max-md:px-2" data-tour="help" title="Help: a short tour of the app" @click="startTour">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.2"/>
         <path d="M5.35 5.6a1.7 1.7 0 113.2.75c-.35.6-1.55.95-1.55 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>

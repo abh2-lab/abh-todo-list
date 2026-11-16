@@ -25,6 +25,15 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
+      // Text sizes for the app around the notes (menus, lists, buttons): a little bigger
+      // than Tailwind's own (xs was 12px, sm was 14px), so they are easy to read.
+      // The note text itself has its own sizes in app/assets/main.css.
+      fontSize: {
+        '2xs': ['0.75rem', { lineHeight: '1rem' }], // 12px: the smallest labels
+        xs: ['0.8125rem', { lineHeight: '1.125rem' }], // 13px
+        btn: ['0.875rem', { lineHeight: '1.25rem' }], // 14px: buttons
+        sm: ['0.9375rem', { lineHeight: '1.375rem' }], // 15px
+      },
     },
   },
   plugins: [typography],

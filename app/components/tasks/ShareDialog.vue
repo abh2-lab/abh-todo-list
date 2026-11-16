@@ -150,13 +150,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
             <!-- Pick the months -->
             <div class="mt-4 flex flex-wrap items-end gap-3">
-              <label class="flex flex-col gap-1 text-[11px] text-[#666]">
+              <label class="flex flex-col gap-1 text-2xs text-[#666]">
                 From
                 <select v-model="from" class="bg-[#0a0a0a] border border-[#1f1f1f] rounded px-2 py-1.5 text-xs text-[#f0f0f0] outline-none focus:border-[#6366f1] [color-scheme:dark]">
                   <option v-for="m in months" :key="m.value" :value="m.value">{{ m.label }}</option>
                 </select>
               </label>
-              <label class="flex flex-col gap-1 text-[11px] text-[#666]">
+              <label class="flex flex-col gap-1 text-2xs text-[#666]">
                 To
                 <select v-model="to" class="bg-[#0a0a0a] border border-[#1f1f1f] rounded px-2 py-1.5 text-xs text-[#f0f0f0] outline-none focus:border-[#6366f1] [color-scheme:dark]">
                   <option v-for="m in months" :key="m.value" :value="m.value" :disabled="m.value < from">{{ m.label }}</option>
@@ -202,7 +202,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
               >
                 <div class="flex-1 min-w-[9rem]">
                   <div class="text-sm text-[#ddd]">{{ monthRange(s.from, s.to) }}</div>
-                  <div class="text-[11px] text-[#555]">Made {{ madeOn(s) }}</div>
+                  <div class="text-2xs text-[#555]">Made {{ madeOn(s) }}</div>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                   <button class="btn btn-sm" @click="copy(s.id)">{{ copiedId === s.id ? 'Copied!' : 'Copy link' }}</button>
