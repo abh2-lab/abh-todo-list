@@ -128,7 +128,7 @@ export function useDocuments(opts: {
           scheduleSave(5000)
         }
       } else if (status === 404) {
-        showNotice('This note could not be saved. Someone may have deleted it.')
+        showNotice('This note could not be saved. Someone may have moved it to the Trash.')
       } else if (status === 413) {
         showNotice('This note is too big to save (50 MB at most). Remove some pictures and try again.')
       } else {
@@ -180,7 +180,7 @@ export function useDocuments(opts: {
     } catch (e) {
       if (n === loadsStarted) {
         showNotice(errorStatus(e) === 404
-          ? 'This note can\'t be opened. It may have been deleted.'
+          ? 'This note can\'t be opened. It may have been moved to the Trash.'
           : 'Could not open this note. Check your connection and try again.')
       }
       return false
@@ -351,8 +351,28 @@ export function useDocuments(opts: {
   // Notes being deleted: changes typed in them now are not saved.
   const deleting = new Set<string>()
 
+  /** Delete = move the note to the Trash. It can be restored there for 30 days. */
   async function deleteDoc(id: string) {
-    // No need to save changes of a note that is being deleted.
+    deleting.add(id)
+    try {
+      // It can come back from the Trash, so first save what was typed in it.
+      await saveNow()
+      // Someone else saved it meanwhile and we were asking what to do: the Trash keeps their version.
+      if (conflict.value?.docId === id) {
+        conflict.value = null
+        conflictJob = null
+      }
+      await $fetch(`/api/documents/${id}`, { method: 'DELETE' })
+    } catch (e) {
+      // 404: it is not there any more (deleted somewhere else), so it goes from here too.
+      if (errorStatus(e) !== 404) {
+        showNotice('Could not move the note to the Trash. Check your connection and try again.')
+        return
+      }
+    } finally {
+      deleting.delete(id)
+    }
+    // A save of it that waits to try again (no connection before) would only fail now.
     if (pendingSave?.id === id) {
       pendingSave = null
       if (saveTimer) {
@@ -360,17 +380,9 @@ export function useDocuments(opts: {
         saveTimer = null
       }
     }
-    if (conflict.value?.docId === id) {
-      conflict.value = null
-      conflictJob = null
-    }
-    deleting.add(id)
-    try {
-      await $fetch(`/api/documents/${id}`, { method: 'DELETE' })
-    } finally {
-      deleting.delete(id)
-    }
     docs.value = docs.value.filter((d) => d.id !== id)
+    // Its tasks are hidden now (Daily tasks, Pending).
+    void tasksChanged()
     if (activeDoc.value?.id === id) {
       // Open the next note right away (the editor stays, with the undo lists of the other notes).
       const next = docs.value[0]
@@ -381,6 +393,14 @@ export function useDocuments(opts: {
       hold.value = null
       if (!next) await newDoc({ how: 'replace' })
     }
+  }
+
+  /** A note came back from the Trash: show it in the list again. Its tasks are back too. */
+  function onRestored(doc: DocMeta) {
+    if (!docs.value.some((d) => d.id === doc.id)) {
+      docs.value = [...docs.value, doc].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    }
+    void tasksChanged()
   }
 
   function onContentUpdate(content: Record<string, any>) {
@@ -493,6 +513,7 @@ export function useDocuments(opts: {
     loadDoc,
     newDoc,
     deleteDoc,
+    onRestored,
     onContentUpdate,
     updateTitle,
     jumpToHeading,

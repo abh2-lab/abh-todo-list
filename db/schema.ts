@@ -21,6 +21,9 @@ export const documents = pgTable('documents', {
   userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
   // A private note with shared = true can be viewed (not edited) by anyone with the link.
   shared: boolean('shared').notNull().default(false),
+  // Set = the note is in the Trash (since then). It can be restored for 30 days,
+  // then it is deleted for good (server/plugins/empty-trash.ts). Empty (null) = not in the Trash.
+  deletedAt: timestamp('deleted_at'),
 }, (t) => [index('documents_user_id_idx').on(t.userId)])
 
 // Daily tasks. Every task belongs to one person and one day.

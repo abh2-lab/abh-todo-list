@@ -5,6 +5,7 @@ import { tasks } from '../../../db/schema'
 // Your tasks, two ways:
 //   ?from=2026-10-26&to=2026-12-06  for the calendar (only tasks whose line is still in its note)
 //   ?docId=…                        all tasks of one note, for the editor (it tags those lines)
+// Never the tasks of a note in the Trash.
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const query = getQuery(event)
@@ -14,7 +15,7 @@ export default defineEventHandler(async (event) => {
     return db
       .select(taskColumns)
       .from(tasks)
-      .where(and(eq(tasks.userId, user.id), eq(tasks.docId, String(query.docId))))
+      .where(and(eq(tasks.userId, user.id), eq(tasks.docId, String(query.docId)), notInTrashedNote()))
       .orderBy(asc(tasks.createdAt))
   }
 
@@ -23,6 +24,6 @@ export default defineEventHandler(async (event) => {
   return db
     .select(taskColumns)
     .from(tasks)
-    .where(and(eq(tasks.userId, user.id), eq(tasks.inNote, true), between(tasks.day, from, to)))
+    .where(and(eq(tasks.userId, user.id), eq(tasks.inNote, true), between(tasks.day, from, to), notInTrashedNote()))
     .orderBy(asc(tasks.day), asc(tasks.createdAt))
 })

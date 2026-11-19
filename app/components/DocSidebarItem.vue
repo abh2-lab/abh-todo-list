@@ -63,10 +63,10 @@ function relativeTime(date: string | Date) {
       </div>
     </div>
 
-    <!-- Delete -->
+    <!-- Delete (moves the note to the Trash) -->
     <button
       class="w-6 h-6 flex items-center justify-center rounded text-[#333] hover:text-[#ef4444] hover:bg-[#1a0808] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
-      title="Delete"
+      title="Move to Trash"
       @click.stop="emit('delete')"
     >
       <Trash2Icon :size="14" />

@@ -43,6 +43,13 @@
       "when": 1794817751878,
       "tag": "0005_task_cancelled_and_done_day",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795072616842,
+      "tag": "0006_notes_trash",
+      "breakpoints": true
     }
   ]
 }

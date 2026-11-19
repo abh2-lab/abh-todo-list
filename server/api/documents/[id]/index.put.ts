@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     // ...but only the owner can turn the view-only link of a private note on or off.
     if (!user) throw createError({ statusCode: 401, message: 'Log in first' })
     changes.shared = Boolean(body.shared)
-    allowed = eq(documents.userId, user.id)
+    allowed = and(eq(documents.userId, user.id), notInTrash())!
   }
   if (Object.keys(changes).length === 0) {
     throw createError({ statusCode: 400, message: 'Nothing to change' })

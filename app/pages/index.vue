@@ -43,6 +43,7 @@ const {
   loadDoc,
   newDoc,
   deleteDoc,
+  onRestored,
   onContentUpdate,
   updateTitle,
   jumpToHeading,
@@ -81,7 +82,7 @@ watch(addressDocId, async (id) => {
   if (!id || id === activeDoc.value?.id) return
   const ok = docs.value.some((d) => d.id === id) && await loadDoc(id, 'none')
   if (!ok && addressDocId() === id) {
-    if (!docs.value.some((d) => d.id === id)) showNotice('This note can\'t be opened. It may have been deleted.')
+    if (!docs.value.some((d) => d.id === id)) showNotice('This note can\'t be opened. It may have been moved to the Trash.')
     // Stay on the note that is open, and show it in the address again.
     if (activeDoc.value) void router.replace({ path: noteAddress(activeDoc.value.id), query: route.query })
   }
@@ -113,6 +114,15 @@ async function openDoc(id: string) {
 async function makeDoc(opts?: { private?: boolean }) {
   await showNotes()
   await newDoc(opts ?? {})
+}
+
+// ---- Trash: deleted notes, for 30 days (the Trash button at the bottom of the notes list) ----
+const trashOpen = ref(false)
+
+/** "Open it" after a note was restored. */
+async function openRestored(id: string) {
+  trashOpen.value = false
+  await openDoc(id)
 }
 
 // ---- Pending tasks: header button, phone menu dot, and the popup ----
@@ -221,6 +231,7 @@ onBeforeUnmount(() => {
       :reload-key="reloadKey"
       @select-doc="openDoc"
       @delete-doc="deleteDoc"
+      @open-trash="trashOpen = true"
       @new-doc="makeDoc"
       @update-title="updateTitle"
       @update-content="onContentUpdate"
@@ -275,6 +286,7 @@ onBeforeUnmount(() => {
             @select="openDoc"
             @delete="deleteDoc"
             @new-doc="makeDoc"
+            @open-trash="trashOpen = true"
             @close="sidebarOpen = false"
           />
         </Transition>
@@ -319,6 +331,14 @@ onBeforeUnmount(() => {
 
     <!-- Pending tasks popup (both phone and desktop) -->
     <TasksPendingPopup :open="pendingOpen" @close="pendingOpen = false" />
+
+    <!-- Trash (both phone and desktop) -->
+    <TrashDialog
+      :open="trashOpen"
+      @close="trashOpen = false"
+      @restored="onRestored"
+      @open-note="openRestored"
+    />
 
     <!-- Two people editing the same note: ask first, and never write over someone's changes unasked -->
     <NoteEditWarning

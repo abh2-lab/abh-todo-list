@@ -38,6 +38,7 @@ export default defineEventHandler(async (event) => {
       eq(tasks.userId, share.userId),
       eq(tasks.inNote, true),
       between(tasks.day, share.fromMonth, monthEnd(share.toMonth)),
+      notInTrashedNote(), // not the tasks of a note in the Trash
     ))
     .orderBy(asc(tasks.day), asc(tasks.createdAt))
 

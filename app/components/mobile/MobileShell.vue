@@ -20,6 +20,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'select-doc': [id: string]
   'delete-doc': [id: string]
+  'open-trash': []
   'new-doc': [opts?: { private?: boolean }]
   'update-title': [title: string]
   'update-content': [content: Record<string, any>]
@@ -197,6 +198,7 @@ watch(tour.open, (isOpen) => {
         :logged-in="loggedIn"
         @select="handleSidebarSelect"
         @delete="emit('delete-doc', $event)"
+        @open-trash="emit('open-trash')"
         @new-doc="handleNewFromSidebar"
         @close="sidebarOpen = false"
       >

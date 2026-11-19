@@ -13,6 +13,23 @@ export interface FullDoc extends DocMeta {
   content: Record<string, any>
 }
 
+/** A note in the Trash. Public ones: everyone sees them. Private ones: only their owner. */
+export interface TrashedDoc {
+  id: string
+  title: string
+  updatedAt: string
+  isPrivate: boolean
+  /** When it was moved to the Trash. */
+  deletedAt: string
+  /** When it is deleted for good (30 days later). */
+  purgeAt: string
+}
+
+/** A note in the Trash with its text, to read it (view only). */
+export interface FullTrashedDoc extends TrashedDoc {
+  content: Record<string, any>
+}
+
 /** The two parts of the app, switched from the header. */
 export type AppView = 'notes' | 'tasks'
 

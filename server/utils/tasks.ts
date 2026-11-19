@@ -1,7 +1,15 @@
-import { and, eq } from 'drizzle-orm'
-import { tasks } from '../../db/schema'
+import { and, eq, sql, type SQL } from 'drizzle-orm'
+import { documents, tasks } from '../../db/schema'
 import type { useDb } from '../db'
 import { withoutNul } from '#shared/text'
+
+/**
+ * Tasks whose note is not in the Trash. The tasks of a note in the Trash are hidden
+ * (Daily tasks, Pending, share links). They come back when the note is restored.
+ */
+export function notInTrashedNote(): SQL {
+  return sql`not exists (select 1 from ${documents} where ${documents.id} = ${tasks.docId} and ${documents.deletedAt} is not null)`
+}
 
 /** The task fields we send to the browser. */
 export const taskColumns = {

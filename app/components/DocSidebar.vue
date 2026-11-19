@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronRightIcon, PlusIcon } from '@lucide/vue'
+import { ChevronRightIcon, PlusIcon, Trash2Icon } from '@lucide/vue'
 import type { DocMeta } from '~/types/docs'
 
 const props = defineProps<{
@@ -15,6 +15,8 @@ const emit = defineEmits<{
   select: [id: string]
   delete: [id: string]
   'new-doc': [opts: { private?: boolean }]
+  /** The Trash button: deleted notes (read or restore them for 30 days). */
+  'open-trash': []
   close: []
 }>()
 
@@ -36,9 +38,14 @@ function pick(id: string) {
 }
 
 function handleDelete(id: string) {
-  if (confirm('Delete this document? This cannot be undone.')) {
+  if (confirm('Move this note to the Trash? You can get it back for 30 days.')) {
     emit('delete', id)
   }
+}
+
+function openTrash() {
+  emit('open-trash')
+  emit('close')
 }
 </script>
 
@@ -145,5 +152,17 @@ function handleDelete(id: string) {
         </div>
       </div>
     </template>
+
+    <!-- Trash: deleted notes stay there for 30 days -->
+    <div class="shrink-0 border-t border-[#1f1f1f] bg-[#060606] pl-2 pr-3 py-1.5">
+      <button
+        class="w-full flex items-center gap-1.5 px-2 py-1.5 rounded text-left text-2xs text-[#555] hover:text-[#999] hover:bg-[#0d0d0d] transition-colors select-none"
+        title="Deleted notes: read or restore them for 30 days"
+        @click="openTrash"
+      >
+        <Trash2Icon :size="14" class="shrink-0" />
+        <span class="font-semibold uppercase tracking-wider">Trash</span>
+      </button>
+    </div>
   </aside>
 </template>

@@ -13,11 +13,11 @@ export default defineEventHandler(async (event) => {
   let docId: string | null = null
   if (body.docId != null) {
     docId = String(body.docId)
-    // Only your own private notes can have task lines.
+    // Only your own private notes can have task lines (not a note in the Trash).
     const [doc] = await db
       .select({ id: documents.id })
       .from(documents)
-      .where(and(eq(documents.id, docId), eq(documents.userId, user.id)))
+      .where(and(eq(documents.id, docId), eq(documents.userId, user.id), notInTrash()))
     if (!doc) throw createError({ statusCode: 404, message: 'Note not found' })
   }
 
