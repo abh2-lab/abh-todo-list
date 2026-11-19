@@ -63,9 +63,9 @@ function relativeTime(date: string | Date) {
       </div>
     </div>
 
-    <!-- Delete (moves the note to the Trash) -->
+    <!-- Delete (moves the note to the Trash). With a mouse it shows on hover; on phones and tablets always. -->
     <button
-      class="w-6 h-6 flex items-center justify-center rounded text-[#333] hover:text-[#ef4444] hover:bg-[#1a0808] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
+      class="note-delete w-6 h-6 flex items-center justify-center rounded text-[#333] hover:text-[#ef4444] hover:bg-[#1a0808] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all shrink-0"
       title="Move to Trash"
       @click.stop="emit('delete')"
     >
@@ -73,3 +73,17 @@ function relativeTime(date: string | Date) {
     </button>
   </div>
 </template>
+
+<style scoped>
+/* Phones and tablets have no mouse to hover with, so the delete button always shows there:
+   a little brighter, and bigger so it is easy to tap. (Its icon stays in the same place.) */
+@media (hover: none) {
+  .note-delete {
+    opacity: 1;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-right: -0.375rem;
+    color: #555;
+  }
+}
+</style>
