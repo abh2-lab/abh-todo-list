@@ -5,6 +5,7 @@ import {
   refreshTaskLines,
   revealTaskLine,
   syncTaskLines,
+  takeLineOffList,
   type LineTask,
   type TaskLinesStorage,
 } from '~/lib/taskLines'
@@ -159,27 +160,94 @@ export function useLineTasks(
     if (failed < lines.length) void tasksChanged()
   }
 
-  // Ticks of the same task are sent one after the other, so the last one wins.
+  // Changes of the same task are sent one after the other, so the last one wins.
   const queues = new Map<string, Promise<void>>()
-  function onCheck(id: string, done: boolean) {
-    const e = editor.value
-    const now = e ? storageOf(e).tasks.get(id) : undefined
-    // Ticked = done (that takes the cancel off). Unticked = not done.
-    const tracked = track(id, { day: now?.day ?? todayKey(), done, cancelled: done ? false : now?.cancelled, took: null })
+  function sendChange(id: string, body: Record<string, unknown>, task: LineTask, failText: string) {
+    const tracked = track(id, task)
     const run = async () => {
       try {
-        await $fetch(`/api/tasks/${id}`, { method: 'PUT', body: done ? { done, doneDay: todayKey() } : { done } })
+        await $fetch(`/api/tasks/${id}`, { method: 'PUT', body })
         tracked.settle()
         void tasksChanged()
       } catch {
         tracked.drop()
-        showError('Could not save the task. Try again.')
-        void load() // put the checkbox back the way the list has it
+        showError(failText)
+        void load() // put the line back the way the list has it
       }
     }
     const next = (queues.get(id) ?? Promise.resolve()).then(run)
     queues.set(id, next)
     void next.finally(() => { if (queues.get(id) === next) queues.delete(id) })
+  }
+
+  function onCheck(id: string, done: boolean) {
+    const e = editor.value
+    const now = e ? storageOf(e).tasks.get(id) : undefined
+    // Ticked = done (that takes the cancel off). Unticked = not done.
+    sendChange(
+      id,
+      done ? { done, doneDay: todayKey() } : { done },
+      { day: now?.day ?? todayKey(), done, cancelled: done ? false : now?.cancelled, took: null },
+      'Could not save the task. Try again.',
+    )
+  }
+
+  // ---- Changes from the note itself: the tag's menu, and "Move to today" in the toolbar ----
+
+  /** Show the change on the line right away (tag, and the tick of a checklist line), then save it. */
+  function changeTask(id: string, body: Record<string, unknown>, next: (t: LineTask) => LineTask, failText: string) {
+    const e = editor.value
+    if (!e || e.isDestroyed) return
+    const s = storageOf(e)
+    const now = s.tasks.get(id)
+    if (!now) return
+    const task = next(now)
+    s.tasks.set(id, task)
+    syncTaskLines(e)
+    sendChange(id, body, task, failText)
+  }
+
+  function moveTask(id: string, day: string) {
+    changeTask(id, { day }, (t) => ({ ...t, day }), 'Could not move the task. Try again.')
+  }
+
+  function setDone(id: string, done: boolean) {
+    changeTask(
+      id,
+      done ? { done, doneDay: todayKey() } : { done },
+      // Done takes the cancel off. How many days it took comes with the next load.
+      (t) => ({ ...t, done, cancelled: done ? false : t.cancelled, took: null }),
+      'Could not save the task. Try again.',
+    )
+  }
+
+  function setCancelled(id: string, cancelled: boolean) {
+    changeTask(
+      id,
+      { cancelled },
+      (t) => ({ ...t, cancelled, done: cancelled ? false : t.done, took: cancelled ? null : t.took }),
+      cancelled ? 'Could not cancel the task. Try again.' : 'Could not undo. Try again.',
+    )
+  }
+
+  /** Take the line off the Daily tasks list: the note changes (Undo brings it back), the text stays. */
+  function takeOff(id: string) {
+    const e = editor.value
+    if (e && !takeLineOffList(e, id)) showError('This line is not in the note any more.')
+  }
+
+  // The menu of one task line (its tag was clicked). A copy of the task, as it was when the menu opened.
+  const menu = ref<{ id: string; task: LineTask; anchor: DOMRect } | null>(null)
+
+  function openMenu(id: string, tag: HTMLElement) {
+    const e = editor.value
+    const task = e ? storageOf(e).tasks.get(id) : undefined
+    if (!task) return
+    menu.value = { id, task: { ...task }, anchor: tag.getBoundingClientRect() }
+  }
+
+  function closeMenu() {
+    menu.value = null
   }
 
   // ---- When to load ----
@@ -191,8 +259,14 @@ export function useLineTasks(
       const s = storageOf(e)
       s.onMark = (lines) => { void onMark(lines) }
       s.onCheck = onCheck
+      s.onTagClick = openMenu
+      s.onMoveToToday = (ids) => {
+        const today = todayKey()
+        for (const id of ids) moveTask(id, today)
+      }
       // Another note: forget the old note's tasks right away.
       if (e !== oldE || opts.docId() !== oldDocId) {
+        closeMenu()
         if (s.tasks.size) {
           s.tasks = new Map()
           refreshTaskLines(e)
@@ -223,5 +297,5 @@ export function useLineTasks(
     if (errorTimer) clearTimeout(errorTimer)
   })
 
-  return { error }
+  return { error, menu, closeMenu, moveTask, setDone, setCancelled, takeOff }
 }

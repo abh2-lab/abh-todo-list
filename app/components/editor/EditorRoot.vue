@@ -209,12 +209,38 @@ watch(
 )
 
 // "Today's task" lines: tags, ticks and the link with the Daily tasks list.
-const { error: taskError } = useLineTasks(editor, {
+const {
+  error: taskError,
+  menu: taskMenu,
+  closeMenu: closeTaskMenu,
+  moveTask,
+  setDone,
+  setCancelled,
+  takeOff,
+} = useLineTasks(editor, {
   docId: () => props.docId,
   enabled: () => !!props.taskMode,
 })
 
+/** A choice in the menu of a task line: do it, and close the menu. */
+function onTaskMenu(run: (id: string) => void) {
+  const id = taskMenu.value?.id
+  closeTaskMenu()
+  if (id) run(id)
+}
+
+// The menu stays where it opened: close it when the note scrolls or the window changes size.
+function closeTaskMenuOnMove() {
+  if (taskMenu.value) closeTaskMenu()
+}
+onMounted(() => {
+  scroller.value?.addEventListener('scroll', closeTaskMenuOnMove, { passive: true })
+  window.addEventListener('resize', closeTaskMenuOnMove)
+})
+
 onBeforeUnmount(() => {
+  scroller.value?.removeEventListener('scroll', closeTaskMenuOnMove)
+  window.removeEventListener('resize', closeTaskMenuOnMove)
   editor.value?.destroy()
   if (saveTimer) clearTimeout(saveTimer)
 })
@@ -234,6 +260,21 @@ onBeforeUnmount(() => {
           {{ taskError }}
         </div>
       </Transition>
+
+      <!-- The menu of a task line (from its tag) -->
+      <TasksLineMenu
+        v-if="taskMenu"
+        :key="taskMenu.id"
+        :task="taskMenu.task"
+        :anchor="taskMenu.anchor"
+        :today="todayKey()"
+        :can-take-off="editable !== false"
+        @close="closeTaskMenu"
+        @move="(day: string) => onTaskMenu((id) => moveTask(id, day))"
+        @done="(done: boolean) => onTaskMenu((id) => setDone(id, done))"
+        @cancel="(cancelled: boolean) => onTaskMenu((id) => setCancelled(id, cancelled))"
+        @take-off="onTaskMenu(takeOff)"
+      />
     </Teleport>
   </div>
 </template>

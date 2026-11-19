@@ -5,6 +5,7 @@
 // - editing the line's text changes the task text (its done / day stay the same),
 // - ticking a checklist line marks the task done, and the other way round,
 // - the line shows a small tag: "Task · today", "Task · done", "Task · cancelled", ...
+//   Clicking (or tapping) the tag opens a menu: move to today or another day, done, cancel, ...
 //
 // The editor only knows the tasks of the open note (storage.tasks). The code that talks to
 // the server (useLineTasks) fills that map and gets told when lines are marked or ticked.
@@ -40,6 +41,10 @@ export interface TaskLinesStorage {
   onMark: ((lines: { id: string; text: string }[]) => void) | null
   /** A checklist task line was ticked or unticked. */
   onCheck: ((id: string, done: boolean) => void) | null
+  /** The tag of a task line was clicked: open its menu next to the tag. */
+  onTagClick: ((id: string, tag: HTMLElement) => void) | null
+  /** "Move to today" (toolbar button) for these tasks. */
+  onMoveToToday: ((ids: string[]) => void) | null
 }
 
 declare module '@tiptap/core' {
@@ -47,6 +52,8 @@ declare module '@tiptap/core' {
     taskLines: {
       /** Mark the line(s) at the cursor as today's task, or take the mark off. */
       toggleTodayTask: () => ReturnType
+      /** The line(s) at the cursor are tasks of an earlier day, not done: move them to today. */
+      moveTasksToToday: () => ReturnType
     }
   }
   /** editor.storage.taskLines */
@@ -128,6 +135,87 @@ export function isOnTaskLine(editor: Editor): boolean {
   return lines.length > 0 && lines.every((l) => isTask(l.node, storage))
 }
 
+/** done, cancelled, late (an earlier day, not done), today, or later (a day still to come). */
+export type LineState = 'done' | 'cancelled' | 'late' | 'today' | 'later'
+
+export function lineState(task: LineTask, today: string): LineState {
+  if (task.done) return 'done'
+  if (task.cancelled) return 'cancelled'
+  return task.day < today ? 'late' : task.day === today ? 'today' : 'later'
+}
+
+/**
+ * The cursor is on task lines of an earlier day that are not done (the tag says "Task · not done"):
+ * their ids. Then the toolbar button says "Move to today". Otherwise: no ids.
+ */
+export function lateTasksAtCursor(editor: Editor): string[] {
+  const storage = storageOf(editor)
+  if (!storage?.enabled) return []
+  const today = storage.today || todayKey()
+  const ids: string[] = []
+  for (const l of linesInSelection(editor.state)) {
+    const id = l.node.attrs.taskId as string | null | undefined
+    const task = id ? storage.tasks.get(id) : undefined
+    if (!id || !task || lineState(task, today) !== 'late') return []
+    ids.push(id)
+  }
+  return ids
+}
+
+/** Take the line with this task id off the Daily tasks list (the text stays). Undo brings it back. */
+export function takeLineOffList(editor: Editor, id: string): boolean {
+  if (editor.isDestroyed) return false
+  const { state } = editor.view
+  let found: { node: PMNode; pos: number } | null = null
+  state.doc.descendants((node, pos) => {
+    if (found) return false
+    if (node.attrs.taskId === id && LINE_TYPES.includes(node.type.name)) {
+      found = { node, pos }
+      return false
+    }
+    return true
+  })
+  if (!found) return false
+  const { node, pos } = found as { node: PMNode; pos: number }
+  editor.view.dispatch(state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, taskId: null }))
+  return true
+}
+
+function tagText(task: LineTask, state: LineState): string {
+  switch (state) {
+    case 'done': return task.took && task.took > 1 ? `Task · done in ${task.took} days` : 'Task · done'
+    case 'cancelled': return 'Task · cancelled'
+    case 'late': return 'Task · not done'
+    case 'today': return 'Task · today'
+    default: return `Task · ${shortDay(task.day)}`
+  }
+}
+
+// A small "open" arrow in the tag (Lucide chevron-down).
+const CHEVRON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'
+
+/** The tag after a task line: a small button that opens the task's menu. */
+function tagButton(id: string, state: LineState, text: string, storage: TaskLinesStorage) {
+  return () => {
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.className = `task-tag task-tag-${state}`
+    el.contentEditable = 'false'
+    el.title = 'Task options'
+    el.setAttribute('aria-haspopup', 'menu')
+    el.append(text)
+    el.insertAdjacentHTML('beforeend', CHEVRON)
+    // Keep the cursor where it is: the click is for the menu, not for the text.
+    el.addEventListener('mousedown', (e) => e.preventDefault())
+    el.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      storage.onTagClick?.(id, el)
+    })
+    return el
+  }
+}
+
 function buildTags(doc: PMNode, storage: TaskLinesStorage): DecorationSet {
   if (!storage.enabled || storage.tasks.size === 0) return DecorationSet.empty
   const today = storage.today || todayKey()
@@ -135,20 +223,10 @@ function buildTags(doc: PMNode, storage: TaskLinesStorage): DecorationSet {
   doc.descendants((node, pos) => {
     const id = node.attrs.taskId as string | null | undefined
     const task = id ? storage.tasks.get(id) : undefined
-    if (!task || !LINE_TYPES.includes(node.type.name)) return true
+    if (!id || !task || !LINE_TYPES.includes(node.type.name)) return true
 
-    const state = task.done
-      ? 'done'
-      : task.cancelled ? 'cancelled' : task.day < today ? 'late' : task.day === today ? 'today' : 'later'
-    const tag = state === 'done'
-      ? (task.took && task.took > 1 ? `Task · done in ${task.took} days` : 'Task · done')
-      : state === 'cancelled'
-        ? 'Task · cancelled'
-        : state === 'late'
-        ? 'Task · not done'
-        : state === 'today'
-          ? 'Task · today'
-          : `Task · ${shortDay(task.day)}`
+    const state = lineState(task, today)
+    const tag = tagText(task, state)
 
     // The tag sits after the line's own text (for list items: their first paragraph).
     const target = node.type.name === 'paragraph'
@@ -159,8 +237,17 @@ function buildTags(doc: PMNode, storage: TaskLinesStorage): DecorationSet {
     if (target) {
       decorations.push(Decoration.node(target.pos, target.pos + target.node.nodeSize, {
         class: `task-line task-${state}${storage.flashId === id ? ' task-flash' : ''}`,
-        'data-task-tag': tag,
       }))
+      // Not on an empty line: there the cursor would have no text to sit next to.
+      if (target.node.content.size > 0) {
+        const end = target.pos + target.node.nodeSize - 1
+        decorations.push(Decoration.widget(end, tagButton(id, state, tag, storage), {
+          side: 1, // after the text: typing at the end of the line goes before the tag
+          key: `task-tag:${id}:${state}:${tag}`,
+          ignoreSelection: true,
+          stopEvent: () => true, // the editor leaves clicks on the tag alone
+        }))
+      }
     }
     return true
   })
@@ -211,6 +298,8 @@ export const TaskLines = Extension.create<object, TaskLinesStorage>({
       flashId: null,
       onMark: null,
       onCheck: null,
+      onTagClick: null,
+      onMoveToToday: null,
     }
   },
 
@@ -261,6 +350,14 @@ export const TaskLines = Extension.create<object, TaskLinesStorage>({
           })
           queueMicrotask(() => storage.onMark?.(made))
         }
+        return true
+      },
+
+      moveTasksToToday: () => ({ editor, dispatch }) => {
+        const ids = lateTasksAtCursor(editor)
+        if (ids.length === 0) return false
+        // Only the day changes (in the list); the note stays the same.
+        if (dispatch) queueMicrotask(() => this.storage.onMoveToToday?.(ids))
         return true
       },
     }

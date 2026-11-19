@@ -2,7 +2,7 @@
 import { BoldIcon, CalendarCheckIcon, CodeIcon, Grid2x2XIcon, ImageIcon, ItalicIcon, LinkIcon, ListIcon, ListOrderedIcon, ListTodoIcon, MinusIcon, PanelTopIcon, QuoteIcon, Redo2Icon, SquareCodeIcon, SquarePlayIcon, StrikethroughIcon, TableIcon, Undo2Icon, UnlinkIcon } from '@lucide/vue'
 import { TableColumnDeleteIcon, TableColumnLeftIcon, TableColumnRightIcon, TableRowAboveIcon, TableRowBelowIcon, TableRowDeleteIcon } from '~/lib/tableIcons'
 import type { Editor } from '@tiptap/vue-3'
-import { isOnTaskLine } from '~/lib/taskLines'
+import { isOnTaskLine, lateTasksAtCursor } from '~/lib/taskLines'
 import { youtubeSrc } from '#shared/noteContent'
 
 const props = defineProps<{
@@ -10,6 +10,13 @@ const props = defineProps<{
   /** Your own private note: show the "Today's task" button. */
   taskMode?: boolean
 }>()
+
+// The cursor is on a task of an earlier day that is not done: the "Today's task" button moves it to today.
+// (Read on every redraw of the toolbar, like isOnTaskLine; the toolbar redraws when the note or cursor changes.)
+const lateHere = computed(() => {
+  void props.editor?.state // redraw with the editor
+  return !!props.editor && lateTasksAtCursor(props.editor).length > 0
+})
 
 const imageInput = ref<HTMLInputElement | null>(null)
 const showYoutubeModal = ref(false)
@@ -152,9 +159,20 @@ const buttons = computed<BtnDef[]>(() => {
         <ListTodoIcon :size="18" />
       </button>
 
-      <!-- Today's task: put this line in today's Daily tasks list (click again to take it off) -->
+      <!-- Today's task: put this line in today's Daily tasks list (click again to take it off).
+           On a task of an earlier day that is not done, it moves the task to today instead. -->
       <button
-        v-if="taskMode"
+        v-if="taskMode && lateHere"
+        data-tour="today-task"
+        title="Move this task to today"
+        class="toolbar-btn toolbar-btn-label active"
+        @click="editor.chain().focus().moveTasksToToday().run()"
+      >
+        <CalendarCheckIcon :size="18" />
+        <span class="hidden sm:inline text-xs whitespace-nowrap">Move to today</span>
+      </button>
+      <button
+        v-else-if="taskMode"
         data-tour="today-task"
         :title="isOnTaskLine(editor) ? 'Take this line off the Daily tasks list' : 'Today\'s task: add this line to today\'s Daily tasks list'"
         class="toolbar-btn toolbar-btn-label"
