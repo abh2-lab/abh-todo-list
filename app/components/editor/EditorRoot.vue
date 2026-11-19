@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useEditor, EditorContent, VueNodeViewRenderer } from '@tiptap/vue-3'
+import { useEditor, EditorContent, VueNodeViewRenderer, createDocument, type Editor } from '@tiptap/vue-3'
+import { EditorState, TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { TaskList, TaskItem } from '@tiptap/extension-list'
 import Image from '@tiptap/extension-image'
@@ -151,19 +152,57 @@ watch(
   (val) => editor.value?.setEditable(val !== false, false),
 )
 
+// ---- Undo and Redo: every note has its own ----
+// One editor shows all notes. Each note we leave keeps its whole editor state while the page
+// is open: its text, cursor and undo/redo list (and where it was scrolled to). Coming back to it,
+// Undo and Redo go on where they were.
+// Opening a note swaps the whole state. It is not a change in the note, so Undo can never
+// bring back another note's text (that text would then be saved into this note).
+const KEEP_NOTES = 20
+const kept = new Map<string, { state: EditorState; scrollTop: number }>()
+
+/** A new state for this content: no undo list yet, cursor at the start. */
+function freshState(e: Editor, content: Record<string, any> | null | undefined): EditorState {
+  const doc = createDocument(normalizeContent(content), e.schema, e.options.parseOptions)
+  return EditorState.create({ doc, plugins: e.state.plugins })
+}
+
+function showState(e: Editor, state: EditorState, scrollTop: number) {
+  e.view.updateState(state)
+  // An empty step, so the toolbar and the rest see the new state. Nothing to undo, nothing to save.
+  e.view.dispatch(e.view.state.tr.setMeta('addToHistory', false).setMeta('preventUpdate', true))
+  void nextTick(() => {
+    if (scroller.value) scroller.value.scrollTop = scrollTop
+  })
+}
+
 // Show new content: another note was opened, or this note has a newer version.
 watch(
   () => [props.docId, props.reloadKey] as const,
   ([docId], [oldDocId]) => {
     const e = editor.value
-    if (!e) return
-    // Same note: keep the cursor (or selection) about where it was.
-    const keep = docId === oldDocId ? e.state.selection : null
-    // No "update": this is the saved note itself, so there is nothing new to save.
-    e.commands.setContent(normalizeContent(props.modelValue), { emitUpdate: false })
-    if (keep) {
-      const end = e.state.doc.content.size
-      e.commands.setTextSelection({ from: Math.min(keep.from, end), to: Math.min(keep.to, end) })
+    if (!e || e.isDestroyed) return
+    const next = freshState(e, props.modelValue)
+
+    if (docId !== oldDocId) {
+      // Keep the note we leave (the newest ones only, they can be big).
+      kept.delete(oldDocId)
+      kept.set(oldDocId, { state: e.state, scrollTop: scroller.value?.scrollTop ?? 0 })
+      if (kept.size > KEEP_NOTES) kept.delete(kept.keys().next().value!)
+
+      const back = kept.get(docId)
+      kept.delete(docId)
+      // Same text as on the server: go on where you were, with its undo list.
+      // Changed somewhere else meanwhile: its undo list starts again, so the texts never mix.
+      if (back && back.state.doc.eq(next.doc)) showState(e, back.state, back.scrollTop)
+      else showState(e, next, 0)
+    } else {
+      // A newer version of this note (saved somewhere else). Its undo list starts again,
+      // so Undo can't put the old text back over the new one. The cursor stays about where it was.
+      const { from, to } = e.state.selection
+      const end = next.doc.content.size
+      const selection = TextSelection.between(next.doc.resolve(Math.min(from, end)), next.doc.resolve(Math.min(to, end)))
+      showState(e, next.apply(next.tr.setSelection(selection)), scroller.value?.scrollTop ?? 0)
     }
     buildToc(e)
   },

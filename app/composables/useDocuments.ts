@@ -20,8 +20,16 @@ function isNewer(a: string | undefined, b: string | undefined) {
   return !!a && (!b || Date.parse(a) > Date.parse(b))
 }
 
+/** How the address changes when a note is opened: a new entry (Back goes to the note before), the same entry, or not at all. */
+export type OpenHow = 'push' | 'replace' | 'none'
+
 export function useDocuments(opts: {
+  /** The note to open first (from the address). */
   initialDocId?: string | null
+  /** The note to open first is not one of your notes: true = the page takes care of it. */
+  onNotYours?: (id: string) => boolean
+  /** A note was opened: put it in the address. */
+  onOpen?: (id: string, how: OpenHow) => void
   /** false while the notes are hidden (Daily tasks is open): then we don't check who is editing. */
   active?: () => boolean
 } = {}) {
@@ -155,12 +163,29 @@ export function useDocuments(opts: {
     docs.value = await $fetch<DocMeta[]>('/api/documents')
   }
 
-  async function loadDoc(id: string) {
-    await saveNow() // finish saving the open note before switching
-    const [doc, now] = await Promise.all([
-      $fetch<FullDoc>(`/api/documents/${id}`),
-      fetchEditors(id),
-    ])
+  // Opening one note after the other quickly: only the last one opens.
+  let loadsStarted = 0
+
+  /** Open a note. False if it could not be opened (or another note was asked for meanwhile). */
+  async function loadDoc(id: string, how: OpenHow = 'push'): Promise<boolean> {
+    const n = ++loadsStarted
+    let doc: FullDoc
+    let now: Awaited<ReturnType<typeof fetchEditors>>
+    try {
+      await saveNow() // finish saving the open note before switching
+      ;[doc, now] = await Promise.all([
+        $fetch<FullDoc>(`/api/documents/${id}`),
+        fetchEditors(id),
+      ])
+    } catch (e) {
+      if (n === loadsStarted) {
+        showNotice(errorStatus(e) === 404
+          ? 'This note can\'t be opened. It may have been deleted.'
+          : 'Could not open this note. Check your connection and try again.')
+      }
+      return false
+    }
+    if (n !== loadsStarted) return false
     const left = activeDoc.value?.id
     if (left && left !== id) leaveNote(left)
     activeDoc.value = doc
@@ -170,6 +195,8 @@ export function useDocuments(opts: {
     // Someone else is editing this note: ask first. The note stays locked until the person chooses.
     editors.value = now?.editors ?? []
     hold.value = editors.value.length ? 'opened' : null
+    if (how !== 'none') opts.onOpen?.(id, how)
+    return true
   }
 
   /** Show the newest version of the open note (saved by someone else, or by you in another tab). */
@@ -273,7 +300,7 @@ export function useDocuments(opts: {
    * If you already have a note with that name, the server names it "9 Nov 2026, Monday_2" (then _3, …).
    * Logged out: always public.
    */
-  async function newDoc(opts: { private?: boolean } = {}) {
+  async function newDoc(opts: { private?: boolean; how?: OpenHow } = {}) {
     await saveNow()
     const makePrivate = loggedIn.value && (opts.private ?? true)
     let doc: FullDoc
@@ -290,7 +317,7 @@ export function useDocuments(opts: {
       return
     }
     docs.value.unshift(doc)
-    await loadDoc(doc.id)
+    await loadDoc(doc.id, opts.how ?? 'push')
   }
 
   // ---- A short message at the top (like "You can make at most 100 new notes a day") ----
@@ -321,6 +348,9 @@ export function useDocuments(opts: {
     }
   }
 
+  // Notes being deleted: changes typed in them now are not saved.
+  const deleting = new Set<string>()
+
   async function deleteDoc(id: string) {
     // No need to save changes of a note that is being deleted.
     if (pendingSave?.id === id) {
@@ -334,20 +364,28 @@ export function useDocuments(opts: {
       conflict.value = null
       conflictJob = null
     }
-    await $fetch(`/api/documents/${id}`, { method: 'DELETE' })
+    deleting.add(id)
+    try {
+      await $fetch(`/api/documents/${id}`, { method: 'DELETE' })
+    } finally {
+      deleting.delete(id)
+    }
     docs.value = docs.value.filter((d) => d.id !== id)
     if (activeDoc.value?.id === id) {
+      // Open the next note right away (the editor stays, with the undo lists of the other notes).
+      const next = docs.value[0]
+      if (next && await loadDoc(next.id, 'replace')) return
       activeDoc.value = null
       editorContent.value = {}
       editors.value = []
       hold.value = null
-      if (docs.value.length > 0) await loadDoc(docs.value[0]!.id)
+      if (!next) await newDoc({ how: 'replace' })
     }
   }
 
   function onContentUpdate(content: Record<string, any>) {
     editorContent.value = content
-    if (!activeDoc.value) return
+    if (!activeDoc.value || deleting.has(activeDoc.value.id)) return
     // Locked (we are asking first, or the person is only reading): this tab does not save the note.
     if (locked.value) return
     // Changes of another note still waiting? Save them first.
@@ -410,22 +448,22 @@ export function useDocuments(opts: {
     window.addEventListener('pagehide', onPageHide)
     editorsTimer = setInterval(() => void checkEditors(), CHECK_EDITORS_MS)
     await loadDocs()
-    // A link from the task list ("Open note") opens that note, if it is in your list.
-    const linked = opts.initialDocId ? docs.value.find((d) => d.id === opts.initialDocId) : undefined
-    if (linked) {
-      try {
-        await loadDoc(linked.id)
+    // The address names a note (/note/<id>, or a link from the task list): open it, if it is one of your notes.
+    const wanted = opts.initialDocId
+    if (wanted) {
+      if (docs.value.some((d) => d.id === wanted)) {
+        if (await loadDoc(wanted, 'replace')) return
+      } else if (opts.onNotYours?.(wanted)) {
         return
-      } catch {
-        // Could not load it: open the usual note below.
       }
+      // Could not open it: open the usual note below.
     }
     // Logged in: start with your newest private note.
     const first = (loggedIn.value && docs.value.find((d) => d.isPrivate)) || docs.value[0]
     if (first) {
-      await loadDoc(first.id)
+      await loadDoc(first.id, 'replace')
     } else {
-      await newDoc()
+      await newDoc({ how: 'replace' })
     }
   })
 
@@ -440,6 +478,7 @@ export function useDocuments(opts: {
 
   return {
     notice,
+    showNotice,
     docs,
     activeDoc,
     saveStatus,

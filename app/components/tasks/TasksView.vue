@@ -40,7 +40,7 @@ function isPending(t: Task) {
 
 /** "Open note" opens the note in a new tab, at the task's line. */
 function noteLink(t: Task) {
-  return `/?doc=${encodeURIComponent(t.docId!)}&task=${encodeURIComponent(t.id)}`
+  return `/note/${encodeURIComponent(t.docId!)}?task=${encodeURIComponent(t.id)}`
 }
 
 let loadToken = 0

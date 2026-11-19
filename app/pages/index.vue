@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import type { AppView } from '~/types/docs'
+import type { OpenHow } from '~/composables/useDocuments'
+
+// This page is "/" and also "/note/<id>" (app/router.options.ts). The fixed key keeps the page
+// (and its editor) when you go from one note to another, so every note keeps its own undo list.
+definePageMeta({ key: 'notes-app' })
 
 const isMobile = useIsMobile()
 const route = useRoute()
 const router = useRouter()
 const { loggedIn } = useUserSession()
 
-// "Open note" in the task list opens /?doc=…&task=… in a new tab: open that note and jump to the line.
-const linkDocId = typeof route.query.doc === 'string' ? route.query.doc : null
+/** The note in the address: /note/<id>. */
+const addressDocId = () => (typeof route.params.id === 'string' ? route.params.id : null)
+const noteAddress = (id: string) => `/note/${encodeURIComponent(id)}`
+
+// "Open note" in the task list opens /note/<id>?task=… in a new tab: open that note and jump to the line.
+// (Older links look like /?doc=…&task=…; they still work.)
+const linkDocId = addressDocId() ?? (typeof route.query.doc === 'string' ? route.query.doc : null)
 const linkTaskId = typeof route.query.task === 'string' ? route.query.task : null
 const focusTask = useFocusTask()
 if (linkDocId && linkTaskId) focusTask.value = { docId: linkDocId, taskId: linkTaskId }
@@ -23,6 +33,7 @@ const view = computed<AppView>({
 
 const {
   notice,
+  showNotice,
   docs,
   activeDoc,
   saveStatus,
@@ -46,7 +57,35 @@ const {
   keepMine,
   takeTheirs,
   onEditorSaveStatus,
-} = useDocuments({ initialDocId: linkDocId, active: () => view.value === 'notes' })
+} = useDocuments({
+  initialDocId: linkDocId,
+  active: () => view.value === 'notes',
+  // The open note is always in the address (a refresh opens it again; Back and Forward go between notes).
+  onOpen: (id: string, how: OpenHow) => {
+    const path = noteAddress(id)
+    if (route.path === path) return
+    const query = { ...route.query, doc: undefined, task: undefined }
+    void (how === 'replace' ? router.replace({ path, query }) : router.push({ path, query }))
+  },
+  // The address names a note that is not one of yours (maybe a note someone shared with a link):
+  // show the view-only page, which opens shared notes and says so when a note can't be opened.
+  onNotYours: (id: string) => {
+    if (!addressDocId()) return false
+    void router.replace(`/doc/${encodeURIComponent(id)}`)
+    return true
+  },
+})
+
+// Back or Forward in the browser (or a changed address): open the note in the address.
+watch(addressDocId, async (id) => {
+  if (!id || id === activeDoc.value?.id) return
+  const ok = docs.value.some((d) => d.id === id) && await loadDoc(id, 'none')
+  if (!ok && addressDocId() === id) {
+    if (!docs.value.some((d) => d.id === id)) showNotice('This note can\'t be opened. It may have been deleted.')
+    // Stay on the note that is open, and show it in the address again.
+    if (activeDoc.value) void router.replace({ path: noteAddress(activeDoc.value.id), query: route.query })
+  }
+})
 
 // Lines can be marked as "Today's task" only in your own private notes.
 const taskMode = computed(() => loggedIn.value && !!activeDoc.value?.isPrivate)
@@ -61,14 +100,19 @@ usePageTitle(() => {
 const sidebarOpen = ref(false)
 const viewMode = ref(false)
 
-function openDoc(id: string) {
-  view.value = 'notes'
-  loadDoc(id)
+/** Show the notes (not Daily tasks). Done before a note opens, so its new address has no "?view=tasks". */
+async function showNotes() {
+  if (view.value !== 'notes') await router.replace({ query: { ...route.query, view: undefined } })
 }
 
-function makeDoc(opts?: { private?: boolean }) {
-  view.value = 'notes'
-  newDoc(opts ?? {})
+async function openDoc(id: string) {
+  await showNotes()
+  await loadDoc(id)
+}
+
+async function makeDoc(opts?: { private?: boolean }) {
+  await showNotes()
+  await newDoc(opts ?? {})
 }
 
 // ---- Pending tasks: header button, phone menu dot, and the popup ----
@@ -127,7 +171,7 @@ function whenTrue(ok: () => boolean, maxMs?: number) {
 
 async function maybeStartTour() {
   // Not when a task's "Open note" link opened this page: that jumps to a line in the note.
-  if (tour.seen() || linkDocId) return
+  if (tour.seen() || linkTaskId) return
   // Wait for the note, so the tour has something to point at.
   await whenTrue(() => !!activeDoc.value, 5000)
   // The pending popup comes first; the tour opens after it is closed.
