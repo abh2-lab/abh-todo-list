@@ -37,6 +37,7 @@ export default defineNuxtConfig({
   //   things, like "Delete", without knowing)
   // - the browser doesn't guess file types, and doesn't send full page addresses to other sites
   // - no plugins (like Flash), and no camera, microphone or location
+  // - search engines don't list any page (the site is for the team; see also public/robots.txt)
   routeRules: {
     '/**': {
       headers: {
@@ -45,6 +46,7 @@ export default defineNuxtConfig({
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+        'X-Robots-Tag': 'noindex, nofollow, noarchive',
       },
     },
   },
@@ -52,6 +54,8 @@ export default defineNuxtConfig({
   // App logo (public/favicon.svg) in the browser tab, plus copies for older browsers and phones
   app: {
     head: {
+      // Search engines: don't list this site (the X-Robots-Tag header above says the same).
+      meta: [{ name: 'robots', content: 'noindex, nofollow, noarchive' }],
       link: [
         { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
         { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' },

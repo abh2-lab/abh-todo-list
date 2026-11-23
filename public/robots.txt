@@ -1,0 +1,24 @@
+# This site is for our team, not for search engines.
+#
+# Everyone: stay out, except the shared links (/doc/... and /shared/...). Those stay open
+# so that an AI chat can read a link someone pastes into it (some AI chats follow this file
+# even then). Every page also says "noindex", so search engines don't list any of them.
+User-agent: *
+Allow: /doc/
+Allow: /shared/
+Disallow: /
+
+# Search engines and AI crawlers that collect pages for themselves: nothing at all.
+User-agent: Googlebot
+User-agent: Bingbot
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: PerplexityBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+Disallow: /
