@@ -2,10 +2,11 @@ import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import { useDb } from '../../../db'
 import { documents, groupNotes } from '../../../../db/schema'
 import { cleanBoard } from '#shared/board'
+import { cleanKanban } from '#shared/kanban'
 
-// One group with its board, and the notes in it (name, first words, private or public).
-// Notes in the Trash are listed with inTrash, so their cards keep their place on the board
-// and come back if the note is restored.
+// One group with its two boards (the Mind map and the Kanban), and the notes in it (name,
+// first words, private or public). Notes in the Trash are listed with inTrash, so their cards
+// keep their place on the boards and come back if the note is restored.
 export default defineEventHandler(async (event) => {
   const { user } = await requireUserSession(event)
   const group = await ownGroup(user.id, getRouterParam(event, 'id')!)
@@ -33,6 +34,8 @@ export default defineEventHandler(async (event) => {
     name: group.name,
     version: group.boardVersion,
     board: cleanBoard(group.board),
+    kanbanVersion: group.kanbanVersion,
+    kanban: cleanKanban(group.kanban),
     notes: rows.map((r) => ({
       id: r.id,
       title: r.title,

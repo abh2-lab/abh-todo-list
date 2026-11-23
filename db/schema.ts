@@ -78,6 +78,10 @@ export const noteGroups = pgTable('note_groups', {
   // Goes up by one at each save of the board. A save says which number it started from,
   // so two tabs never write over each other's changes without knowing.
   boardVersion: integer('board_version').notNull().default(0),
+  // The Kanban board of the same group: columns with cards in them (shared/kanban.ts).
+  // Saved on its own, with its own save number, like the board above.
+  kanban: json('kanban').notNull().default({}),
+  kanbanVersion: integer('kanban_version').notNull().default(0),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 }, (t) => [index('note_groups_user_id_idx').on(t.userId)])

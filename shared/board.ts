@@ -1,4 +1,5 @@
-// The board of a group (a Mind map): cards, and lines between them.
+// The Mind map of a group: cards, and lines between them. (Its Kanban is in shared/kanban.ts,
+// with the same kinds of cards.)
 // It is saved as one piece of JSON (note_groups.board). Like notes, it comes from the browser,
 // so the server keeps only a cleaned copy (cleanBoard): known kinds of cards, plain values,
 // safe web addresses, and sizes within limits. The app cleans what it loads the same way.
@@ -18,15 +19,10 @@ export type BoardColor = typeof BOARD_COLORS[number]
 export const SIDES = ['top', 'right', 'bottom', 'left'] as const
 export type Side = typeof SIDES[number]
 
-export interface BoardCard {
+/** What a card shows (on a Mind map and on a Kanban). */
+export interface CardContent {
   id: string
   kind: CardKind
-  /** Top-left corner, in board pixels. */
-  x: number
-  y: number
-  /** Size in board pixels, when the card was resized. */
-  w?: number
-  h?: number
   color?: BoardColor
   /** note: which note. */
   docId?: string
@@ -41,6 +37,16 @@ export interface BoardCard {
   fileName?: string
   fileType?: string
   fileSize?: number
+}
+
+/** A card on a Mind map: what it shows, and where it is. */
+export interface BoardCard extends CardContent {
+  /** Top-left corner, in board pixels. */
+  x: number
+  y: number
+  /** Size in board pixels, when the card was resized. */
+  w?: number
+  h?: number
 }
 
 export interface BoardLine {
@@ -89,15 +95,16 @@ export function opensInBrowser(type: string | undefined): boolean {
   return isBoardImage(type) || type === 'application/pdf'
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
+export function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function cleanId(value: unknown): string | null {
+/** An id of a card, a line or a column (letters, digits, - and _), or null. */
+export function cleanId(value: unknown): string | null {
   return typeof value === 'string' && ID.test(value) ? value : null
 }
 
-function cleanText(value: unknown, max: number): string | undefined {
+export function cleanText(value: unknown, max: number): string | undefined {
   if (typeof value !== 'string') return undefined
   return withoutNul(value).slice(0, max)
 }
@@ -112,7 +119,8 @@ function cleanSize(value: unknown): number | undefined {
   return Number.isFinite(n) && n >= 40 && n <= 4000 ? Math.round(n) : undefined
 }
 
-function cleanColor(value: unknown): BoardColor | undefined {
+/** A color that is not the normal one (gray), or undefined. */
+export function cleanColor(value: unknown): BoardColor | undefined {
   return BOARD_COLORS.includes(value as BoardColor) && value !== 'gray' ? (value as BoardColor) : undefined
 }
 
@@ -136,17 +144,14 @@ export function cleanWebAddress(value: unknown): string | null {
   }
 }
 
-function cleanCard(value: unknown): BoardCard | null {
+/** A cleaned copy of what a card shows (no place or size), or null when it is not a card. */
+export function cleanCardContent(value: unknown): CardContent | null {
   if (!isObject(value)) return null
   const id = cleanId(value.id)
   const kind = CARD_KINDS.includes(value.kind as CardKind) ? (value.kind as CardKind) : null
   if (!id || !kind) return null
 
-  const card: BoardCard = { id, kind, x: cleanPos(value.x), y: cleanPos(value.y) }
-  const w = cleanSize(value.w)
-  const h = cleanSize(value.h)
-  if (w) card.w = w
-  if (h) card.h = h
+  const card: CardContent = { id, kind }
   const color = cleanColor(value.color)
   if (color) card.color = color
 
@@ -192,6 +197,19 @@ function cleanCard(value: unknown): BoardCard | null {
     }
   }
   return card
+}
+
+function cleanCard(value: unknown): BoardCard | null {
+  const content = cleanCardContent(value)
+  if (!content) return null
+  const v = value as Record<string, unknown>
+  const { id, kind, ...rest } = content
+  const card: BoardCard = { id, kind, x: cleanPos(v.x), y: cleanPos(v.y) }
+  const w = cleanSize(v.w)
+  const h = cleanSize(v.h)
+  if (w) card.w = w
+  if (h) card.h = h
+  return Object.assign(card, rest)
 }
 
 function cleanLine(value: unknown, cardIds: Set<string>): BoardLine | null {

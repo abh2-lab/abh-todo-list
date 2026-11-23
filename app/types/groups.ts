@@ -1,4 +1,5 @@
 import type { BoardData } from '#shared/board'
+import type { KanbanData } from '#shared/kanban'
 
 /** A group in the notes list (only its owner sees it). */
 export interface GroupMeta {
@@ -21,12 +22,15 @@ export interface GroupNote {
   preview: string
 }
 
-/** A group with its board, for the board page. */
+/** A group with its two boards, for the board page. */
 export interface FullGroup {
   id: string
   name: string
-  /** The board's save number (see PUT /api/groups/<id>). */
+  /** The Mind map's save number (see PUT /api/groups/<id>). */
   version: number
   board: BoardData
+  /** The Kanban's save number. */
+  kanbanVersion: number
+  kanban: KanbanData
   notes: GroupNote[]
 }
