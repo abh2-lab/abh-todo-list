@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core'
-import { NodeResizeControl } from '@vue-flow/node-resizer'
+import { NodeResizeControl, ResizeControlVariant } from '@vue-flow/node-resizer'
 import { ImageOffIcon } from '@lucide/vue'
 import type { BoardCard } from '#shared/board'
 import { BOARD_CONTEXT, colorOf } from '~/lib/board'
@@ -35,7 +35,7 @@ function open() {
     <NodeResizeControl
       :node-id="id"
       position="right"
-      variant="line"
+      :variant="ResizeControlVariant.Line"
       class="board-resize"
       :min-width="100"
       :max-width="1600"
@@ -55,7 +55,7 @@ function open() {
       This picture is not on the server any more.
     </div>
 
-    <CardNameInput v-if="editing" :id="id" :value="data.text" placeholder="Words under the picture" class="mt-1.5" />
+    <CardNameInput v-if="editing" :value="data.text" placeholder="Words under the picture" class="mt-1.5" @done="(name) => board.doneText(id, name)" />
     <div v-else-if="data.text" class="mt-1.5 px-1 pb-0.5 text-[13px] leading-snug text-[#ddd] break-words">
       {{ data.text }}
     </div>

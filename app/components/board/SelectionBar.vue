@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ArrowRightIcon, BookOpenIcon, DownloadIcon, ExternalLinkIcon, HeadingIcon, MinusIcon, PencilIcon, Trash2Icon, TypeIcon } from '@lucide/vue'
-import { BOARD_COLORS, opensInBrowser, type BoardCard, type BoardColor, type BoardLine } from '#shared/board'
+import { BOARD_COLORS, opensInBrowser, type BoardColor, type BoardLine, type CardContent } from '#shared/board'
 import { COLORS } from '~/lib/board'
 
-// The bar at the top of the board for what is selected: colors, and what fits the card or line.
+// The bar at the top of a board for what is selected: colors, and what fits the card or line.
+// (The Kanban puts its own buttons in it too: the slot, before Delete.)
 const props = defineProps<{
-  cards: BoardCard[]
+  cards: CardContent[]
   lines: BoardLine[]
 }>()
 
@@ -18,8 +19,8 @@ const emit = defineEmits<{
   dashed: []
   read: [docId: string]
   openLink: [url: string]
-  openFile: [card: BoardCard]
-  downloadFile: [card: BoardCard]
+  openFile: [card: CardContent]
+  downloadFile: [card: CardContent]
   remove: []
 }>()
 
@@ -31,7 +32,7 @@ const current = computed<BoardColor | null>(() => {
   return colors.size === 1 ? ([...colors][0] as BoardColor) : null
 })
 
-const KIND_NAMES: Record<BoardCard['kind'], string> = {
+const KIND_NAMES: Record<CardContent['kind'], string> = {
   note: 'Note',
   text: 'Text',
   link: 'Link',
@@ -45,7 +46,7 @@ const what = computed(() => {
   return `${count.value} selected`
 })
 const removeTitle = computed(() => {
-  if (props.cards.some((c) => c.kind === 'note')) return 'Take off the board (notes are not deleted: they stay in your notes list)'
+  if (props.cards.some((c) => c.kind === 'note')) return 'Take out of the group, so off both boards (notes are not deleted: they stay in your notes list)'
   return 'Delete (Delete key). Ctrl+Z brings it back.'
 })
 </script>
@@ -157,6 +158,8 @@ const removeTitle = computed(() => {
         Dashed
       </button>
     </template>
+
+    <slot />
 
     <div class="w-px h-5 bg-[#1f1f1f] mx-0.5" />
     <button class="btn btn-ghost btn-sm hover:!text-[#fca5a5]" :title="removeTitle" @click="emit('remove')">

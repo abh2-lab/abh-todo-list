@@ -5,55 +5,42 @@ import { MiniMap } from '@vue-flow/minimap'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import '@vue-flow/node-resizer/dist/style.css'
-import {
-  ChevronLeftIcon,
-  FileTextIcon,
-  LinkIcon,
-  MaximizeIcon,
-  MinusIcon,
-  NetworkIcon,
-  PlusIcon,
-  Redo2Icon,
-  TypeIcon,
-  Undo2Icon,
-  UploadIcon,
-  XIcon,
-} from '@lucide/vue'
+import '~/assets/board.css'
+import { MaximizeIcon, MinusIcon, NetworkIcon, PlusIcon, Redo2Icon, Undo2Icon, UploadIcon } from '@lucide/vue'
 import {
   MAX_CARDS,
-  MAX_FILE_BYTES,
-  MAX_FILE_MB,
   MAX_FILE_NAME,
   MAX_LABEL,
   MAX_LINES,
-  MAX_TEXT,
-  cleanWebAddress,
   isBoardImage,
   newBoardId,
   type BoardCard,
   type BoardColor,
   type BoardData,
   type BoardLine,
+  type CardContent,
   type Side,
 } from '#shared/board'
 import { youtubeSrc } from '#shared/noteContent'
-import { notePreview } from '#shared/noteText'
 import {
   BOARD_CONTEXT,
   CARD_WIDTH,
   COLORS,
   cardToNode,
-  copyBoard,
   edgeToLine,
+  isTypingIn,
   lineMarker,
   lineToEdge,
   nodeToCard,
+  notesOffText,
+  pastedForBoard,
   placesForNew,
   youtubeId,
 } from '~/lib/board'
-import { UploadError, fileUrl, uploadBoardFile, type UploadedFile } from '~/lib/boardFiles'
-import type { DocMeta, FullDoc } from '~/types/docs'
-import type { FullGroup, GroupNote } from '~/types/groups'
+import { downloadBoardFile, openBoardFile, type UploadedFile } from '~/lib/boardFiles'
+import type { DocMeta } from '~/types/docs'
+import type { FullGroup } from '~/types/groups'
+import BoardHeader from './BoardHeader.vue'
 import BoardLineEdge from './BoardLine.vue'
 import FileCard from './FileCard.vue'
 import ImageCard from './ImageCard.vue'
@@ -62,11 +49,13 @@ import LinkDialog from './LinkDialog.vue'
 import NoteCard from './NoteCard.vue'
 import NotePicker from './NotePicker.vue'
 import NoteReader from './NoteReader.vue'
+import NoticeBar from './NoticeBar.vue'
 import SelectionBar from './SelectionBar.vue'
 import TextCard from './TextCard.vue'
 import VideoCard from './VideoCard.vue'
 
-// The board of a group (a Mind map): its notes as cards, text cards, and lines between them.
+// The Mind map of a group: its notes as cards, text cards, and lines between them. (The
+// group's other board is the Kanban: KanbanView.vue.)
 // It saves by itself a moment after each change. Ctrl+Z / Ctrl+Y undo and redo.
 //
 // The notes in the group decide which note cards there are: a note put in the group from the
@@ -77,7 +66,6 @@ const props = defineProps<{ groupId: string }>()
 
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 2.5
-const MAX_UNDO = 100
 /** About the height of a text card with one line, for placing a new one. */
 const TEXT_CARD_HEIGHT = 46
 
@@ -115,16 +103,14 @@ const {
   zoomIn,
   zoomOut,
 } = useVueFlow(flowId)
-const { setInGroup, renameGroup } = useGroups()
 
+const header = ref<InstanceType<typeof BoardHeader> | null>(null)
 const canvas = ref<HTMLElement | null>(null)
 const name = ref('')
 const loaded = ref(false)
 const loadError = ref<'gone' | 'failed' | null>(null)
-/** The notes in the group (name, first words), by note id. */
-const notes = ref(new Map<string, GroupNote>())
-/** The notes in the group, as the server has them (with the ones in the Trash). */
-const members = new Set<string>()
+const { notice, tell } = useBoardNotice()
+const { notes, members, setNotes, inTrash, syncMembers, addNote, newNote } = useBoardNotes(props.groupId, tell)
 /** Cards of notes in the Trash, and their lines: not shown, but saved with the board. */
 let hiddenCards: BoardCard[] = []
 let hiddenLines: BoardLine[] = []
@@ -141,15 +127,6 @@ const connecting = ref(false)
 
 usePageTitle(() => name.value || 'Board')
 
-// ---- A short message at the bottom (with "Undo" after deleting) ----
-const notice = ref<{ text: string; undo?: boolean; error?: boolean } | null>(null)
-let noticeTimer: ReturnType<typeof setTimeout> | null = null
-function tell(text: string, opts: { undo?: boolean; error?: boolean } = {}) {
-  notice.value = { text, ...opts }
-  if (noticeTimer) clearTimeout(noticeTimer)
-  noticeTimer = setTimeout(() => (notice.value = null), opts.error ? 10000 : 8000)
-}
-
 // ---- The board as data ----
 
 function currentBoard(): BoardData {
@@ -161,7 +138,7 @@ function currentBoard(): BoardData {
 
 /** Put a board on the screen (when it is loaded, and for undo and redo). */
 function showBoard(board: BoardData) {
-  const hidden = new Set(board.cards.filter((c) => c.docId && notes.value.get(c.docId)?.inTrash).map((c) => c.id))
+  const hidden = new Set(board.cards.filter((c) => inTrash(c.docId)).map((c) => c.id))
   hiddenCards = board.cards.filter((c) => hidden.has(c.id))
   hiddenLines = board.lines.filter((l) => hidden.has(l.from) || hidden.has(l.to))
   editingId.value = null
@@ -170,163 +147,40 @@ function showBoard(board: BoardData) {
   setEdges(board.lines.filter((l) => !hidden.has(l.from) && !hidden.has(l.to)).map(lineToEdge))
 }
 
-// ---- Undo and redo: copies of the whole board ----
-let lastState: BoardData = { cards: [], lines: [] }
-let lastJson = ''
-let undoStack: BoardData[] = []
-let redoStack: BoardData[] = []
-const canUndo = ref(false)
-const canRedo = ref(false)
-
-function setBase(board: BoardData) {
-  lastJson = JSON.stringify(board)
-  lastState = JSON.parse(lastJson) as BoardData
-}
-
-function historyChanged() {
-  canUndo.value = undoStack.length > 0
-  canRedo.value = redoStack.length > 0
-}
-
-/** Call after each change: it can be undone, and it is saved soon. */
-function changed() {
-  const now = currentBoard()
-  const json = JSON.stringify(now)
-  if (json === lastJson) return
-  undoStack.push(lastState)
-  if (undoStack.length > MAX_UNDO) undoStack.shift()
-  redoStack = []
-  setBase(now)
-  historyChanged()
-  markUnsaved()
-}
-
-function restore(board: BoardData) {
-  showBoard(copyBoard(board))
-  setBase(currentBoard())
-  historyChanged()
-  markUnsaved()
-  void syncMembers()
-}
-
-function undo() {
-  const before = undoStack.pop()
-  if (!before) return
-  redoStack.push(lastState)
-  restore(before)
-  notice.value = null
-}
-
-function redo() {
-  const after = redoStack.pop()
-  if (!after) return
-  undoStack.push(lastState)
-  restore(after)
-}
-
-/**
- * Keep the group's notes the same as the note cards on the board: after taking note cards off,
- * and after undo or redo. Notes in the Trash stay in the group.
- */
-let syncing: Promise<void> = Promise.resolve()
-function syncMembers() {
-  syncing = syncing.then(async () => {
-    const want = new Set<string>()
-    for (const c of lastState.cards) if (c.kind === 'note' && c.docId) want.add(c.docId)
-    for (const [id, n] of notes.value) if (n.inTrash && members.has(id)) want.add(id)
-    for (const id of want) {
-      if (members.has(id)) continue
-      members.add(id)
-      try {
-        await setInGroup(props.groupId, id, true)
-      } catch (e) {
-        members.delete(id)
-        tell(errorMessage(e) ?? 'Could not put a note back in the group. Check your connection.', { error: true })
-      }
-    }
-    for (const id of [...members]) {
-      if (want.has(id)) continue
-      members.delete(id)
-      try {
-        await setInGroup(props.groupId, id, false)
-      } catch {
-        members.add(id)
-        tell('Could not take a note out of the group. Check your connection.', { error: true })
-      }
-    }
-  })
-  return syncing
-}
-
-// ---- Saving ----
-const saveState = ref<'saved' | 'waiting' | 'saving' | 'error'>('saved')
-let changeNo = 0
-let savedNo = 0
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-let running: Promise<void> | null = null
-
-function markUnsaved() {
-  changeNo++
-  saveState.value = 'waiting'
-  queueSave(800)
-}
-
-function queueSave(ms: number) {
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    saveTimer = null
-    void saveNow()
-  }, ms)
-}
-
-/** Save now. true = everything is saved. */
-async function saveNow(): Promise<boolean> {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
-  while (running) await running
-  if (changeNo === savedNo) return true
-  running = sendBoard()
-  await running
-  running = null
-  return changeNo === savedNo
-}
-
-async function sendBoard() {
-  const no = changeNo
-  saveState.value = 'saving'
-  try {
+// ---- Saving, and undo and redo ----
+const { saveState, saveText, markUnsaved, saveNow, allSaved } = useBoardSaving({
+  send: async () => {
     const saved = await $fetch<{ version: number }>(`/api/groups/${encodeURIComponent(props.groupId)}`, {
       method: 'PUT',
       body: { board: currentBoard(), version },
     })
     version = saved.version
-    savedNo = no
-    if (changeNo === savedNo) saveState.value = 'saved'
-    else {
-      saveState.value = 'waiting'
-      queueSave(800)
-    }
-  } catch (e) {
-    if (errorStatus(e) === 409) {
-      // Saved somewhere else (another tab): show that board. What was not saved here is dropped.
-      savedNo = changeNo
-      saveState.value = 'saved'
-      tell('This board was changed in another tab or window, so it was loaded again.', { error: true })
-      await load()
-      return
-    }
-    saveState.value = 'error'
-    queueSave(5000)
-  }
+  },
+  onConflict: async () => {
+    tell('This board was changed in another tab or window, so it was loaded again.', { error: true })
+    await load()
+  },
+})
+
+const history = useBoardHistory<BoardData>({ current: currentBoard, show: showBoard, onChange: markUnsaved })
+const { canUndo, canRedo } = history
+/** Call after each change: it can be undone, and it is saved soon. */
+const changed = history.changed
+
+/** Keep the group's notes the same as the note cards on the board (after taking cards off, undo and redo). */
+function syncNoteCards() {
+  return syncMembers(() => history.latest().cards.flatMap((c) => (c.kind === 'note' && c.docId ? [c.docId] : [])))
 }
 
-const saveText = computed(() => {
-  if (saveState.value === 'error') return 'Not saved: trying again…'
-  if (saveState.value === 'saved') return 'Saved'
-  return 'Saving…'
-})
+function undo() {
+  if (!history.undo()) return
+  notice.value = null
+  void syncNoteCards()
+}
+
+function redo() {
+  if (history.redo()) void syncNoteCards()
+}
 
 // ---- Loading ----
 async function load() {
@@ -340,12 +194,10 @@ async function load() {
   }
   name.value = g.name
   version = g.version
-  notes.value = new Map(g.notes.map((n) => [n.id, n]))
-  members.clear()
-  for (const n of g.notes) members.add(n.id)
+  setNotes(g.notes)
 
-  // Cards of notes taken out of the group (from the notes list) go away, and notes put in the
-  // group from the notes list get a card, below the others.
+  // Cards of notes taken out of the group (from the notes list or the Kanban) go away, and notes
+  // put in the group there get a card, below the others.
   const cards = g.board.cards.filter((c) => c.kind !== 'note' || (c.docId && members.has(c.docId)))
   const ids = new Set(cards.map((c) => c.id))
   const lines = g.board.lines.filter((l) => ids.has(l.from) && ids.has(l.to))
@@ -359,10 +211,7 @@ async function load() {
 
   const board: BoardData = { cards, lines }
   showBoard(board)
-  setBase(currentBoard())
-  undoStack = []
-  redoStack = []
-  historyChanged()
+  history.reset()
   loaded.value = true
   if (JSON.stringify(board) !== JSON.stringify(g.board)) markUnsaved()
   await nextTick()
@@ -508,7 +357,7 @@ function doneText(id: string, text: string | null) {
 // ---- Links and videos ----
 
 /** A card for a web address: a video card for a YouTube video, a link card for the rest. */
-function addLink(url: string, name = '', at?: { x: number; y: number }) {
+function addLink(url: string, linkName = '', at?: { x: number; y: number }) {
   linkOpen.value = false
   if (!loaded.value || !roomForCard()) return
   const isVideo = !!youtubeSrc(url) && !!youtubeId(url)
@@ -518,7 +367,7 @@ function addLink(url: string, name = '', at?: { x: number; y: number }) {
   const c = at ?? viewCenter()
   const p = freePlace({ x: c.x - w / 2, y: c.y - h / 2 }, w, h)
   const card: BoardCard = { id: newBoardId(), kind, x: p.x, y: p.y, url }
-  if (name) card.text = name.slice(0, MAX_LABEL)
+  if (linkName) card.text = linkName.slice(0, MAX_LABEL)
   addNodes([cardToNode(card)])
   changed()
 }
@@ -539,89 +388,23 @@ function onCanvasPointerLeave() {
  * and a picture (like a screenshot) or a copied file is uploaded.
  */
 function onPaste(e: ClipboardEvent) {
-  if (!loaded.value || pickerOpen.value || linkOpen.value) return
-  const t = e.target as HTMLElement | null
-  if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.closest?.('.board-reader'))) return
-  const at = lastPointer ? toBoard(lastPointer.x, lastPointer.y) : undefined
-  const text = e.clipboardData?.getData('text/plain').trim() ?? ''
-  // Words come first: programs like Word also copy a picture of the words.
-  const files = text ? [] : [...(e.clipboardData?.files ?? [])]
-  if (files.length) {
-    e.preventDefault()
-    addFiles(files, at)
-    return
-  }
-  if (!text) return
+  if (!loaded.value || pickerOpen.value || linkOpen.value || isTypingIn(e.target)) return
+  const pasted = pastedForBoard(e)
+  if (!pasted) return
   e.preventDefault()
-  const url = /^(https?:\/\/|www\.)\S+$/i.test(text) ? cleanWebAddress(text) : null
-  if (url) addLink(url, '', at)
-  else addText(at, text.slice(0, MAX_TEXT))
+  const at = lastPointer ? toBoard(lastPointer.x, lastPointer.y) : undefined
+  if ('files' in pasted) addFiles(pasted.files, at)
+  else if ('url' in pasted) addLink(pasted.url, '', at)
+  else addText(at, pasted.text)
 }
 
 // ---- Pictures and files ----
-
-const fileInput = ref<HTMLInputElement | null>(null)
-/** Files waiting to be uploaded (one after the other), and where their cards go. */
-const uploadQueue: { file: File; at?: { x: number; y: number } }[] = []
-/** How many files are being uploaded now, how many are done, and how much of this one is sent (0 to 1). */
-const uploadCount = ref(0)
-const uploadDone = ref(0)
-const uploadPart = ref(0)
-const uploading = computed(() => uploadCount.value > 0)
-const uploadStop = new AbortController()
-let uploadRunning = false
-
-const uploadText = computed(() => {
-  const percent = `${Math.round(uploadPart.value * 100)}%`
-  return uploadCount.value > 1 ? `Uploading ${uploadDone.value + 1} of ${uploadCount.value}… ${percent}` : `Uploading… ${percent}`
-})
-
-function pickFiles() {
-  fileInput.value?.click()
-}
-
-function onFilesPicked() {
-  const input = fileInput.value
-  if (!input) return
-  const files = [...(input.files ?? [])]
-  input.value = ''
-  addFiles(files)
-}
+const uploads = useBoardUploads<{ x: number; y: number }>({ groupId: props.groupId, hasRoom: roomForCard, place: addFileCard, tell })
+const { uploading, uploadText } = uploads
 
 /** Upload pictures and files, and put a card for each one on the board (near `at`, or the middle). */
 function addFiles(files: File[], at?: { x: number; y: number }) {
-  if (!loaded.value || !files.length || !roomForCard()) return
-  const big = files.filter((f) => f.size > MAX_FILE_BYTES)
-  const ok = files.filter((f) => f.size > 0 && f.size <= MAX_FILE_BYTES)
-  if (big.length === 1) tell(`"${big[0]!.name}" is too big: a file can be at most ${MAX_FILE_MB} MB.`, { error: true })
-  else if (big.length > 1) tell(`${big.length} files are too big: a file can be at most ${MAX_FILE_MB} MB.`, { error: true })
-  // A dropped folder looks like an empty file.
-  else if (ok.length < files.length) tell('Folders and empty files can\'t be put on the board. For the files in a folder, open it and pick them.', { error: true })
-  for (const file of ok) uploadQueue.push({ file, at })
-  uploadCount.value += ok.length
-  void runUploads()
-}
-
-async function runUploads() {
-  if (uploadRunning) return
-  uploadRunning = true
-  while (uploadQueue.length && !uploadStop.signal.aborted && roomForCard()) {
-    const { file, at } = uploadQueue.shift()!
-    uploadPart.value = 0
-    try {
-      addFileCard(await uploadBoardFile(props.groupId, file, (part) => (uploadPart.value = part), uploadStop.signal), at)
-    } catch (e) {
-      if (e instanceof UploadError && e.status === -1) break
-      const why = e instanceof Error ? e.message : 'The file could not be uploaded.'
-      tell(uploadCount.value > 1 ? `${file.name}: ${why}` : why, { error: true })
-    }
-    uploadDone.value++
-  }
-  uploadQueue.length = 0
-  uploadCount.value = 0
-  uploadDone.value = 0
-  uploadPart.value = 0
-  uploadRunning = false
+  if (loaded.value) uploads.addFiles(files, at)
 }
 
 /** The card for an uploaded file: a picture card for pictures, a file card for the rest. */
@@ -645,17 +428,12 @@ function addFileCard(f: UploadedFile, at?: { x: number; y: number }) {
   changed()
 }
 
-function openFile(card: BoardCard) {
-  if (card.fileId) window.open(fileUrl(card.fileId), '_blank', 'noopener,noreferrer')
+function openFile(card: CardContent) {
+  if (card.fileId) openBoardFile(card.fileId)
 }
 
-/** Download without leaving the page (a link with "download", clicked). */
-function downloadFile(card: BoardCard) {
-  if (!card.fileId) return
-  const a = document.createElement('a')
-  a.href = fileUrl(card.fileId, true)
-  a.download = card.fileName ?? ''
-  a.click()
+function downloadFile(card: CardContent) {
+  if (card.fileId) downloadBoardFile(card.fileId, card.fileName)
 }
 
 // Files dragged from the computer onto the board.
@@ -858,8 +636,8 @@ function removeSelected() {
   removeEdges(edges.map((e) => e.id))
   removeNodes(nodes.map((n) => n.id), true)
   changed()
-  void syncMembers()
-  if (notesOff) tell(notesOff === 1 ? 'Taken off the board. The note is still in your notes list.' : 'Taken off the board. The notes are still in your notes list.', { undo: true })
+  void syncNoteCards()
+  if (notesOff) tell(notesOffText(notesOff), { undo: true })
   else tell('Deleted.', { undo: true })
 }
 
@@ -873,73 +651,17 @@ function openPicker() {
 async function pickNote(doc: DocMeta) {
   pickerOpen.value = false
   if (members.has(doc.id) || !roomForCard()) return
-  members.add(doc.id)
-  try {
-    await setInGroup(props.groupId, doc.id, true)
-  } catch (e) {
-    members.delete(doc.id)
-    tell(errorMessage(e) ?? 'Could not add the note. Check your connection and try again.', { error: true })
-    return
-  }
-  notes.value.set(doc.id, { id: doc.id, title: doc.title, updatedAt: doc.updatedAt, isPrivate: doc.isPrivate, inTrash: false, preview: '' })
+  if (!(await addNote(doc))) return
   const c = viewCenter()
   const p = freePlace({ x: c.x - CARD_WIDTH.note / 2, y: c.y - 70 }, CARD_WIDTH.note, 140)
   addNodes([cardToNode({ id: newBoardId(), kind: 'note', docId: doc.id, x: p.x, y: p.y })])
   changed()
-  // Its first words, for the card.
-  try {
-    const full = await $fetch<FullDoc>(`/api/documents/${encodeURIComponent(doc.id)}`)
-    const note = notes.value.get(doc.id)
-    if (note) note.preview = notePreview(full.content)
-  } catch {
-    // The card shows only the name.
-  }
 }
 
 async function createNote(title: string) {
   pickerOpen.value = false
-  let doc: DocMeta
-  try {
-    doc = await $fetch<DocMeta>('/api/documents', { method: 'POST', body: { private: true, title } })
-  } catch (e) {
-    tell(errorMessage(e) ?? 'Could not make the note. Check your connection and try again.', { error: true })
-    return
-  }
-  await pickNote(doc)
-}
-
-// ---- The group's name ----
-const renaming = ref(false)
-const nameDraft = ref('')
-const nameInput = ref<HTMLInputElement | null>(null)
-
-function startRename() {
-  nameDraft.value = name.value
-  renaming.value = true
-  nextTick(() => nameInput.value?.select())
-}
-
-async function finishRename() {
-  if (!renaming.value) return
-  renaming.value = false
-  const next = nameDraft.value.trim().replace(/\s+/g, ' ')
-  if (!next || next === name.value) return
-  const before = name.value
-  name.value = next
-  try {
-    name.value = await renameGroup(props.groupId, next)
-  } catch (e) {
-    name.value = before
-    tell(errorMessage(e) ?? 'Could not rename the group. Check your connection.', { error: true })
-  }
-}
-
-function onNameKey(e: KeyboardEvent) {
-  if (e.key === 'Enter') nameInput.value?.blur()
-  else if (e.key === 'Escape') {
-    nameDraft.value = name.value
-    nameInput.value?.blur()
-  }
+  const doc = await newNote(title)
+  if (doc) await pickNote(doc)
 }
 
 // ---- Keys ----
@@ -950,9 +672,7 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (pickerOpen.value || linkOpen.value || e.defaultPrevented) return
-  const t = e.target as HTMLElement | null
-  if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.closest?.('.board-reader'))) return
+  if (pickerOpen.value || linkOpen.value || e.defaultPrevented || isTypingIn(e.target)) return
   const key = e.key.toLowerCase()
   const mod = e.ctrlKey || e.metaKey
   const anySelected = getSelectedNodes.value.length > 0 || getSelectedEdges.value.length > 0
@@ -972,27 +692,11 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 // ---- Leaving: save first ----
-function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (changeNo === savedNo && !editingId.value && !editingLineId.value && !uploading.value) return
-  void saveNow()
-  e.preventDefault()
-  e.returnValue = ''
-}
-
-function onVisibility() {
-  if (document.visibilityState === 'hidden') void saveNow()
-}
-
-async function beforeLeave() {
-  if (uploading.value && !window.confirm('Some files are still uploading. Leave anyway? They will not be put on the board.')) return false
-  // Writing in a card or on a line: keep what was written.
-  ;(document.activeElement as HTMLElement | null)?.blur?.()
-  await nextTick()
-  if (await saveNow()) return true
-  return window.confirm('Your last changes to this board are not saved yet (no connection?). Leave anyway?')
-}
-onBeforeRouteLeave(beforeLeave)
-onBeforeRouteUpdate(beforeLeave)
+useSaveBeforeLeaving({
+  saveNow,
+  unsaved: () => !allSaved() || !!editingId.value || !!editingLineId.value,
+  uploading: () => uploading.value,
+})
 
 provide(BOARD_CONTEXT, {
   notes,
@@ -1013,8 +717,6 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('paste', onPaste)
   window.addEventListener('pointerdown', onPointerDown, true)
-  window.addEventListener('beforeunload', onBeforeUnload)
-  document.addEventListener('visibilitychange', onVisibility)
   void load()
 })
 
@@ -1022,11 +724,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('pointerdown', onPointerDown, true)
-  window.removeEventListener('beforeunload', onBeforeUnload)
-  document.removeEventListener('visibilitychange', onVisibility)
-  if (noticeTimer) clearTimeout(noticeTimer)
-  if (saveTimer) clearTimeout(saveTimer)
-  uploadStop.abort()
 })
 
 function miniMapColor(n: GraphNode) {
@@ -1040,72 +737,24 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
 
 <template>
   <div class="flex flex-col h-screen bg-black overflow-hidden" @dragover="onDragOver" @drop="onDrop">
-    <header class="flex items-center gap-3 px-4 h-12 border-b border-[#1f1f1f] bg-black shrink-0">
-      <NuxtLink
-        to="/"
-        class="flex items-center gap-1 text-2xs text-[#555] hover:text-[#999] transition-colors shrink-0"
-        title="Back to your notes"
-      >
-        <ChevronLeftIcon :size="14" />
-        Notes
-      </NuxtLink>
-      <span class="text-[#1f1f1f] select-none">/</span>
-      <NetworkIcon :size="15" class="text-[#6366f1] shrink-0" />
-      <input
-        v-if="renaming"
-        ref="nameInput"
-        v-model="nameDraft"
-        maxlength="100"
-        aria-label="Name of the group"
-        class="w-64 bg-[#0d0d0d] border border-[#6366f1]/50 rounded px-2 py-1 text-sm text-[#f0f0f0] outline-none"
-        @keydown="onNameKey"
-        @blur="finishRename"
-      >
-      <button
-        v-else
-        class="min-w-0 truncate max-w-[40vw] text-sm font-medium text-[#ddd] hover:text-white"
-        :title="loaded ? 'Rename the group' : undefined"
-        :disabled="!loaded"
-        @click="startRename"
-      >
-        {{ name || (loadError ? 'Board' : 'Loading…') }}
-      </button>
-      <span
-        v-if="loaded"
-        class="text-2xs shrink-0"
-        :class="saveState === 'error' ? 'text-[#fca5a5]' : 'text-[#444]'"
-        aria-live="polite"
-      >
-        {{ saveText }}
-      </span>
-      <span v-if="uploading" class="text-2xs text-[#818cf8] shrink-0 tabular-nums" aria-live="polite">{{ uploadText }}</span>
-      <span class="hidden lg:inline text-2xs text-[#333] shrink-0 select-none">Only you can see this board</span>
-
-      <div class="flex-1" />
-
-      <button class="btn btn-sm" :disabled="!loaded" title="Add one of your notes, or a new note" @click="openPicker">
-        <FileTextIcon :size="14" />
-        Note
-      </button>
-      <button class="btn btn-sm" :disabled="!loaded" title="Add a text card (or double-click an empty place on the board)" @click="addText()">
-        <TypeIcon :size="14" />
-        Text
-      </button>
-      <button class="btn btn-sm" :disabled="!loaded" title="Add a web page or a YouTube video (or copy a link and press Ctrl+V on the board)" @click="linkOpen = true">
-        <LinkIcon :size="14" />
-        Link
-      </button>
-      <button
-        class="btn btn-sm"
-        :disabled="!loaded"
-        title="Add pictures or files from your computer (or drag them onto the board, or paste a picture with Ctrl+V)"
-        @click="pickFiles"
-      >
-        <UploadIcon :size="14" />
-        File
-      </button>
-      <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesPicked">
-    </header>
+    <BoardHeader
+      ref="header"
+      view="map"
+      :group-id="groupId"
+      :name="name"
+      :loaded="loaded"
+      :failed="!!loadError"
+      :save-state="saveState"
+      :save-text="saveText"
+      :upload-text="uploadText"
+      @renamed="name = $event"
+      @error="tell($event, { error: true })"
+      @note="openPicker()"
+      @text="addText()"
+      @link="linkOpen = true"
+      @file="header?.pickFiles()"
+      @files="addFiles($event)"
+    />
 
     <div v-if="loadError" class="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
       <div class="text-[#444] text-sm">
@@ -1241,22 +890,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
           Drag a card's dot to draw a line · Double-click a line to write on it · Shift+drag to select many
         </p>
 
-        <!-- A short message -->
-        <div
-          v-if="notice"
-          class="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 pl-4 pr-2 py-2 rounded-lg border shadow-2xl shadow-black text-sm"
-          :class="notice.error ? 'border-[#7f1d1d] bg-[#1a0b0b] text-[#fca5a5]' : 'border-[#1f1f1f] bg-[#0b0b0b] text-[#ccc]'"
-          role="status"
-        >
-          <span>{{ notice.text }}</span>
-          <button v-if="notice.undo && canUndo" class="btn btn-sm" @click="undo">
-            <Undo2Icon :size="14" />
-            Undo
-          </button>
-          <button class="btn btn-ghost btn-sm !px-1.5" title="Close" @click="notice = null">
-            <XIcon :size="14" />
-          </button>
-        </div>
+        <NoticeBar :notice="notice" :can-undo="canUndo" @undo="undo" @close="notice = null" />
       </div>
 
       <NoteReader v-if="readingId" :doc-id="readingId" class="w-[440px] max-w-[45vw] shrink-0" @close="readingId = null" />
@@ -1269,7 +903,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
       @create="createNote"
       @close="pickerOpen = false"
     />
-    <LinkDialog v-if="linkOpen" @add="(url, name) => addLink(url, name)" @close="linkOpen = false" />
+    <LinkDialog v-if="linkOpen" @add="(url, linkName) => addLink(url, linkName)" @close="linkOpen = false" />
   </div>
 </template>
 
@@ -1281,35 +915,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
   outline: none;
 }
 
-.board-card {
-  position: relative;
-  box-sizing: border-box;
-  min-height: 100%;
-  padding: 12px 14px;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
-  color: #ddd;
-  font-size: 14px;
-  line-height: 1.5;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-}
-
-.board-card.is-selected {
-  box-shadow: 0 0 0 2px #6366f1, 0 6px 20px rgba(0, 0, 0, 0.45);
-}
-
-.board-card.is-picture {
-  padding: 6px;
-}
-
-.board-card.is-topic {
-  padding: 16px 18px;
-  color: #fff;
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
-  text-align: center;
-}
+/* (The cards themselves: ~/assets/board.css.) */
 
 /* The dots on the sides: shown when you point at a card, or while drawing a line. */
 .board-handle {

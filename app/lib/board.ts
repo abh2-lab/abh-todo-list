@@ -1,9 +1,10 @@
-// The board page (Mind map) uses Vue Flow: it works with "nodes" (our cards) and "edges"
-// (our lines). These helpers turn the saved board (shared/board.ts) into nodes and edges,
-// and back, and hold the colors and the sizes of the cards.
+// The Mind map uses Vue Flow: it works with "nodes" (our cards) and "edges" (our lines).
+// These helpers turn the saved board (shared/board.ts) into nodes and edges, and back, and
+// hold the colors and the sizes of the cards. Some are for the Kanban too (colors, videos,
+// links, Ctrl+V).
 import type { InjectionKey, Ref } from 'vue'
 import { MarkerType, type Edge, type GraphEdge, type GraphNode, type Node } from '@vue-flow/core'
-import type { BoardCard, BoardColor, BoardData, BoardLine, Side } from '#shared/board'
+import { MAX_TEXT, cleanWebAddress, type BoardCard, type BoardColor, type BoardData, type BoardLine, type Side } from '#shared/board'
 import type { GroupNote } from '~/types/groups'
 
 /** What the cards and lines of a board can ask the board page for. */
@@ -140,6 +141,34 @@ export function siteName(address: string | undefined): string {
   } catch {
     return ''
   }
+}
+
+/** The message after note cards were taken off a board (that takes them out of the group). */
+export function notesOffText(count: number): string {
+  return count === 1
+    ? 'The note was taken out of the group, so it is off both boards. It is still in your notes list.'
+    : 'The notes were taken out of the group, so they are off both boards. They are still in your notes list.'
+}
+
+/** Someone is writing in a box (or in the note reader): keys and Ctrl+V are theirs, not the board's. */
+export function isTypingIn(target: EventTarget | null): boolean {
+  const t = target as HTMLElement | null
+  return !!t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || !!t.closest?.('.board-reader'))
+}
+
+/**
+ * What Ctrl+V puts on a board: pictures or files (like a screenshot), a web address (a link
+ * or video card), or other words (a text card). null: nothing for the board.
+ */
+export function pastedForBoard(e: ClipboardEvent): { files: File[] } | { url: string } | { text: string } | null {
+  const text = e.clipboardData?.getData('text/plain').trim() ?? ''
+  // Words come first: programs like Word also copy a picture of the words.
+  if (!text) {
+    const files = [...(e.clipboardData?.files ?? [])]
+    return files.length ? { files } : null
+  }
+  const url = /^(https?:\/\/|www\.)\S+$/i.test(text) ? cleanWebAddress(text) : null
+  return url ? { url } : { text: text.slice(0, MAX_TEXT) }
 }
 
 /** A copy that shares nothing with the board on the screen (for undo). */

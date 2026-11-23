@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core'
-import { NodeResizeControl } from '@vue-flow/node-resizer'
+import { NodeResizeControl, ResizeControlVariant } from '@vue-flow/node-resizer'
 import { FileTextIcon, PaperclipIcon } from '@lucide/vue'
 import { opensInBrowser, type BoardCard } from '#shared/board'
 import { BOARD_CONTEXT, colorOf } from '~/lib/board'
-import { fileKindText, fileSizeText, fileUrl } from '~/lib/boardFiles'
+import { downloadBoardFile, fileKindText, fileSizeText, fileUrl, openBoardFile } from '~/lib/boardFiles'
 import CardHandles from './CardHandles.vue'
 import CardNameInput from './CardNameInput.vue'
 
@@ -20,17 +20,10 @@ const about = computed(() => [fileKindText(props.data.fileName, props.data.fileT
 const href = computed(() => (props.data.fileId ? fileUrl(props.data.fileId, !shows.value) : undefined))
 
 function open() {
-  if (!href.value) return
-  if (shows.value) window.open(href.value, '_blank', 'noopener,noreferrer')
-  else downloadFile(href.value)
-}
-
-/** Download without leaving the page (a link with "download", clicked). */
-function downloadFile(url: string) {
-  const a = document.createElement('a')
-  a.href = url
-  a.download = props.data.fileName ?? ''
-  a.click()
+  const id = props.data.fileId
+  if (!id) return
+  if (shows.value) openBoardFile(id)
+  else downloadBoardFile(id, props.data.fileName)
 }
 </script>
 
@@ -45,7 +38,7 @@ function downloadFile(url: string) {
     <NodeResizeControl
       :node-id="id"
       position="right"
-      variant="line"
+      :variant="ResizeControlVariant.Line"
       class="board-resize"
       :min-width="160"
       :max-width="900"
@@ -57,7 +50,7 @@ function downloadFile(url: string) {
       <PaperclipIcon v-else :size="12" class="shrink-0" />
       <span class="truncate">{{ about }}</span>
     </div>
-    <CardNameInput v-if="editing" :id="id" :value="data.text" placeholder="Name of the file" />
+    <CardNameInput v-if="editing" :value="data.text" placeholder="Name of the file" @done="(name) => board.doneText(id, name)" />
     <div v-else class="text-[15px] font-semibold leading-snug text-[#f0f0f0] break-words">
       {{ data.text || data.fileName }}
     </div>

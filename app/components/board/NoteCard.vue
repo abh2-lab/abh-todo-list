@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core'
-import { NodeResizeControl } from '@vue-flow/node-resizer'
+import { NodeResizeControl, ResizeControlVariant } from '@vue-flow/node-resizer'
 import { FileTextIcon, LockIcon } from '@lucide/vue'
 import type { BoardCard } from '#shared/board'
 import { BOARD_CONTEXT, colorOf } from '~/lib/board'
@@ -25,7 +25,7 @@ const look = computed(() => colorOf(props.data.color))
     <NodeResizeControl
       :node-id="id"
       position="right"
-      variant="line"
+      :variant="ResizeControlVariant.Line"
       class="board-resize"
       :min-width="160"
       :max-width="900"

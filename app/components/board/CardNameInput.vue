@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { MAX_LABEL } from '#shared/board'
-import { BOARD_CONTEXT } from '~/lib/board'
 
-// The name of a link or video card, while you write it. Enter or Esc (or a click outside): done.
-const props = defineProps<{ id: string; value?: string; placeholder: string }>()
-const board = inject(BOARD_CONTEXT)!
+// The name of a link, video, picture or file card, while you write it.
+// Enter or Esc (or a click outside): done.
+const props = defineProps<{ value?: string; placeholder: string }>()
+const emit = defineEmits<{ done: [name: string | null] }>()
 
 const draft = ref(props.value ?? '')
 const input = ref<HTMLInputElement | null>(null)
@@ -20,9 +20,10 @@ function focusInput(tries = 30) {
 
 onMounted(() => nextTick(() => focusInput()))
 
+/** The name, or null when it did not change. */
 function done() {
   const name = draft.value.trim()
-  board.doneText(props.id, name === (props.value ?? '') ? null : name)
+  emit('done', name === (props.value ?? '') ? null : name)
 }
 
 function onKey(e: KeyboardEvent) {

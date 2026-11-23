@@ -14,6 +14,19 @@ export function fileUrl(fileId: string, download = false): string {
   return `/api/files/${encodeURIComponent(fileId)}${download ? '?download' : ''}`
 }
 
+/** Open a picture or a PDF in a new tab. */
+export function openBoardFile(fileId: string) {
+  window.open(fileUrl(fileId), '_blank', 'noopener,noreferrer')
+}
+
+/** Download a file without leaving the page (a link with "download", clicked). */
+export function downloadBoardFile(fileId: string, name: string | undefined) {
+  const a = document.createElement('a')
+  a.href = fileUrl(fileId, true)
+  a.download = name ?? ''
+  a.click()
+}
+
 /** A file size for people, like "820 KB" or "2.4 MB". */
 export function fileSizeText(bytes: number | undefined): string {
   if (bytes === undefined) return ''

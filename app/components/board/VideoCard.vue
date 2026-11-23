@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core'
-import { NodeResizeControl } from '@vue-flow/node-resizer'
+import { NodeResizeControl, ResizeControlVariant } from '@vue-flow/node-resizer'
 import { FilmIcon, PlayIcon, SquareIcon } from '@lucide/vue'
 import type { BoardCard } from '#shared/board'
 import { BOARD_CONTEXT, colorOf, siteName, youtubeId, youtubeStart } from '~/lib/board'
@@ -40,7 +40,7 @@ function play() {
     <NodeResizeControl
       :node-id="id"
       position="right"
-      variant="line"
+      :variant="ResizeControlVariant.Line"
       class="board-resize"
       :min-width="200"
       :max-width="1200"
@@ -60,7 +60,7 @@ function play() {
         Stop
       </button>
     </div>
-    <CardNameInput v-if="editing" :id="id" :value="data.text" placeholder="Name of the video" class="mb-1.5" />
+    <CardNameInput v-if="editing" :value="data.text" placeholder="Name of the video" class="mb-1.5" @done="(name) => board.doneText(id, name)" />
     <div v-else-if="data.text" class="mb-1.5 text-[15px] font-semibold leading-snug text-[#f0f0f0] break-words">
       {{ data.text }}
     </div>

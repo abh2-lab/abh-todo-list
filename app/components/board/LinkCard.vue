@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NodeProps } from '@vue-flow/core'
-import { NodeResizeControl } from '@vue-flow/node-resizer'
+import { NodeResizeControl, ResizeControlVariant } from '@vue-flow/node-resizer'
 import { LinkIcon } from '@lucide/vue'
 import type { BoardCard } from '#shared/board'
 import { BOARD_CONTEXT, colorOf, siteName } from '~/lib/board'
@@ -32,7 +32,7 @@ function open() {
     <NodeResizeControl
       :node-id="id"
       position="right"
-      variant="line"
+      :variant="ResizeControlVariant.Line"
       class="board-resize"
       :min-width="160"
       :max-width="900"
@@ -43,7 +43,7 @@ function open() {
       <LinkIcon :size="12" class="shrink-0" />
       <span class="truncate">{{ site || 'Link' }}</span>
     </div>
-    <CardNameInput v-if="editing" :id="id" :value="data.text" placeholder="Name of the link" />
+    <CardNameInput v-if="editing" :value="data.text" placeholder="Name of the link" @done="(name) => board.doneText(id, name)" />
     <div v-else-if="data.text" class="text-[15px] font-semibold leading-snug text-[#f0f0f0] break-words">
       {{ data.text }}
     </div>
