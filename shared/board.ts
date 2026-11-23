@@ -30,7 +30,7 @@ export interface BoardCard {
   color?: BoardColor
   /** note: which note. */
   docId?: string
-  /** text: the words. link: a name for the link. */
+  /** text: the words. link and video: a name for it. */
   text?: string
   /** text: "topic" = big and bold (like the middle of a mind map). */
   style?: 'topic'
@@ -148,7 +148,7 @@ function cleanCard(value: unknown): BoardCard | null {
       const url = cleanWebAddress(value.url)
       if (!url) return null
       card.url = url
-      const name = cleanText(value.text, MAX_LABEL)
+      const name = cleanText(value.text, MAX_LABEL)?.trim()
       if (name) card.text = name
       break
     }
@@ -156,6 +156,8 @@ function cleanCard(value: unknown): BoardCard | null {
       const url = youtubeSrc(value.url)
       if (!url || url.length > MAX_URL) return null
       card.url = url
+      const name = cleanText(value.text, MAX_LABEL)?.trim()
+      if (name) card.text = name
       break
     }
     case 'image':

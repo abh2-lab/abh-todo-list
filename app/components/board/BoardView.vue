@@ -8,6 +8,7 @@ import '@vue-flow/node-resizer/dist/style.css'
 import {
   ChevronLeftIcon,
   FileTextIcon,
+  LinkIcon,
   MaximizeIcon,
   MinusIcon,
   NetworkIcon,
@@ -17,7 +18,20 @@ import {
   Undo2Icon,
   XIcon,
 } from '@lucide/vue'
-import { MAX_CARDS, MAX_LINES, newBoardId, type BoardCard, type BoardColor, type BoardData, type BoardLine, type Side } from '#shared/board'
+import {
+  MAX_CARDS,
+  MAX_LABEL,
+  MAX_LINES,
+  MAX_TEXT,
+  cleanWebAddress,
+  newBoardId,
+  type BoardCard,
+  type BoardColor,
+  type BoardData,
+  type BoardLine,
+  type Side,
+} from '#shared/board'
+import { youtubeSrc } from '#shared/noteContent'
 import { notePreview } from '#shared/noteText'
 import {
   BOARD_CONTEXT,
@@ -30,15 +44,19 @@ import {
   lineToEdge,
   nodeToCard,
   placesForNew,
+  youtubeId,
 } from '~/lib/board'
 import type { DocMeta, FullDoc } from '~/types/docs'
 import type { FullGroup, GroupNote } from '~/types/groups'
 import BoardLineEdge from './BoardLine.vue'
+import LinkCard from './LinkCard.vue'
+import LinkDialog from './LinkDialog.vue'
 import NoteCard from './NoteCard.vue'
 import NotePicker from './NotePicker.vue'
 import NoteReader from './NoteReader.vue'
 import SelectionBar from './SelectionBar.vue'
 import TextCard from './TextCard.vue'
+import VideoCard from './VideoCard.vue'
 
 // The board of a group (a Mind map): its notes as cards, text cards, and lines between them.
 // It saves by itself a moment after each change. Ctrl+Z / Ctrl+Y undo and redo.
@@ -110,6 +128,7 @@ const editingLineId = ref<string | null>(null)
 const readingId = ref<string | null>(null)
 const pickerOpen = ref(false)
 const pickerIds = ref<string[]>([])
+const linkOpen = ref(false)
 const connecting = ref(false)
 
 usePageTitle(() => name.value || 'Board')
@@ -438,17 +457,21 @@ function roomForCard() {
 
 // ---- Text cards ----
 
-/** A new text card, at a place on the board (or in the middle of the screen), ready to write in. */
-function addText(at?: { x: number; y: number }) {
+/**
+ * A new text card, at a place on the board (or near the middle of the screen).
+ * Without words, it is ready to write in.
+ */
+function addText(at?: { x: number; y: number }, text = '') {
   if (!loaded.value || !roomForCard()) return
   const c = at ?? viewCenter()
   const box = { x: c.x - CARD_WIDTH.text / 2, y: c.y - TEXT_CARD_HEIGHT / 2 }
-  // A double-click puts the card right there; the button finds an empty place near the middle.
-  const p = at ? { x: Math.round(box.x), y: Math.round(box.y) } : freePlace(box, CARD_WIDTH.text, TEXT_CARD_HEIGHT)
-  const card: BoardCard = { id: newBoardId(), kind: 'text', x: p.x, y: p.y, text: '' }
+  // A double-click puts the card right there; the others find an empty place near it.
+  const p = at && !text ? { x: Math.round(box.x), y: Math.round(box.y) } : freePlace(box, CARD_WIDTH.text, TEXT_CARD_HEIGHT)
+  const card: BoardCard = { id: newBoardId(), kind: 'text', x: p.x, y: p.y, text }
   addNodes([cardToNode(card)])
-  // Not a change yet: an empty text card goes away when you stop writing.
-  editingId.value = card.id
+  // An empty one is not a change yet: it goes away when you stop writing.
+  if (text) changed()
+  else editingId.value = card.id
 }
 
 function editText(id: string) {
@@ -462,15 +485,59 @@ function doneText(id: string, text: string | null) {
   if (!node) return
   const before = node.data.text ?? ''
   const now = text ?? before
-  if (!now.trim()) {
+  if (node.data.kind === 'text' && !now.trim()) {
     // An empty text card is not kept.
     removeNodes([id], true)
     changed()
     if (before.trim()) tell('The empty card was deleted.', { undo: true })
     return
   }
-  if (text !== null) updateNodeData<BoardCard>(id, { text })
+  // Link and video cards: their name (none = the web address shows).
+  if (text !== null) updateNodeData<BoardCard>(id, { text: text || undefined })
   changed()
+}
+
+// ---- Links and videos ----
+
+/** A card for a web address: a video card for a YouTube video, a link card for the rest. */
+function addLink(url: string, name = '', at?: { x: number; y: number }) {
+  linkOpen.value = false
+  if (!loaded.value || !roomForCard()) return
+  const isVideo = !!youtubeSrc(url) && !!youtubeId(url)
+  const kind = isVideo ? 'video' : 'link'
+  const w = CARD_WIDTH[kind]
+  const h = isVideo ? 240 : 90
+  const c = at ?? viewCenter()
+  const p = freePlace({ x: c.x - w / 2, y: c.y - h / 2 }, w, h)
+  const card: BoardCard = { id: newBoardId(), kind, x: p.x, y: p.y, url }
+  if (name) card.text = name.slice(0, MAX_LABEL)
+  addNodes([cardToNode(card)])
+  changed()
+}
+
+/** Where the mouse was on the board last (for Ctrl+V), or null when it was not on the board. */
+let lastPointer: { x: number; y: number } | null = null
+
+function onCanvasPointerMove(e: PointerEvent) {
+  lastPointer = { x: e.clientX, y: e.clientY }
+}
+
+function onCanvasPointerLeave() {
+  lastPointer = null
+}
+
+/** Ctrl+V on the board: a link becomes a link (or video) card, other words a text card. */
+function onPaste(e: ClipboardEvent) {
+  if (!loaded.value || pickerOpen.value || linkOpen.value) return
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.closest?.('.board-reader'))) return
+  const text = e.clipboardData?.getData('text/plain').trim() ?? ''
+  if (!text) return
+  e.preventDefault()
+  const at = lastPointer ? toBoard(lastPointer.x, lastPointer.y) : undefined
+  const url = /^(https?:\/\/|www\.)\S+$/i.test(text) ? cleanWebAddress(text) : null
+  if (url) addLink(url, '', at)
+  else addText(at, text.slice(0, MAX_TEXT))
 }
 
 /** Double-click on an empty place: a text card there. */
@@ -622,9 +689,10 @@ function toggleDashed() {
   changed()
 }
 
+/** Text card: write in it. Link and video cards: give them a name. */
 function writeSelected() {
   const n = getSelectedNodes.value[0]
-  if (n) editText(n.id)
+  if (n && ['text', 'link', 'video'].includes(n.data?.kind)) editText(n.id)
 }
 
 function labelSelected() {
@@ -736,7 +804,7 @@ function onPointerDown(e: PointerEvent) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (pickerOpen.value || e.defaultPrevented) return
+  if (pickerOpen.value || linkOpen.value || e.defaultPrevented) return
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.closest?.('.board-reader'))) return
   const key = e.key.toLowerCase()
@@ -796,6 +864,7 @@ provide(BOARD_CONTEXT, {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('paste', onPaste)
   window.addEventListener('pointerdown', onPointerDown, true)
   window.addEventListener('beforeunload', onBeforeUnload)
   document.addEventListener('visibilitychange', onVisibility)
@@ -804,6 +873,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('paste', onPaste)
   window.removeEventListener('pointerdown', onPointerDown, true)
   window.removeEventListener('beforeunload', onBeforeUnload)
   document.removeEventListener('visibilitychange', onVisibility)
@@ -872,6 +942,10 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
         <TypeIcon :size="14" />
         Text
       </button>
+      <button class="btn btn-sm" :disabled="!loaded" title="Add a web page or a YouTube video (or copy a link and press Ctrl+V on the board)" @click="linkOpen = true">
+        <LinkIcon :size="14" />
+        Link
+      </button>
     </header>
 
     <div v-if="loadError" class="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
@@ -887,6 +961,8 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
         class="board-canvas relative flex-1 min-w-0"
         :class="{ 'is-connecting': connecting }"
         @dblclick="onCanvasDblClick"
+        @pointermove="onCanvasPointerMove"
+        @pointerleave="onCanvasPointerLeave"
       >
         <VueFlow
           :id="flowId"
@@ -905,6 +981,12 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
           </template>
           <template #node-text="p">
             <TextCard v-bind="p" />
+          </template>
+          <template #node-link="p">
+            <LinkCard v-bind="p" />
+          </template>
+          <template #node-video="p">
+            <VideoCard v-bind="p" />
           </template>
           <template #edge-board="p">
             <BoardLineEdge v-bind="p" />
@@ -946,7 +1028,8 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
             <NetworkIcon :size="28" class="mx-auto mb-3 text-[#2a2a2a]" />
             <p class="text-sm text-[#888]">This board is empty.</p>
             <p class="mt-1 text-xs leading-relaxed text-[#555]">
-              Add your notes with <span class="text-[#888]">Note</span> at the top, or double-click anywhere to write a text card.
+              Add notes, text and links with the buttons at the top, double-click anywhere to write,
+              or copy a link and press Ctrl+V here.
               Then drag a dot on a card's side to another card to join them with a line.
             </p>
           </div>
@@ -1006,6 +1089,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
       @create="createNote"
       @close="pickerOpen = false"
     />
+    <LinkDialog v-if="linkOpen" @add="(url, name) => addLink(url, name)" @close="linkOpen = false" />
   </div>
 </template>
 

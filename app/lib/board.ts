@@ -16,7 +16,10 @@ export interface BoardContext {
   editingLineId: Ref<string | null>
   /** Show a note in the reading panel. */
   read: (docId: string) => void
-  /** Text card: start writing in it, or save what was written (null = no change). */
+  /**
+   * Text card: start writing in it, or save what was written (null = no change).
+   * Link and video cards: the same for their name.
+   */
   editText: (id: string) => void
   doneText: (id: string, text: string | null) => void
   /** Line: start writing its words, or save them (null = no change). */
@@ -98,6 +101,45 @@ export function edgeToLine(edge: GraphEdge<BoardLine> | Edge<BoardLine>): BoardL
   if (edge.targetHandle) line.toSide = edge.targetHandle as Side
   else delete line.toSide
   return line
+}
+
+/** The id of a YouTube video in a web address (youtu.be/…, watch?v=…, shorts/…, embed/…), or null. */
+export function youtubeId(address: string): string | null {
+  let url: URL
+  try {
+    url = new URL(address)
+  } catch {
+    return null
+  }
+  let id: string | null | undefined
+  if (url.hostname.toLowerCase() === 'youtu.be') id = url.pathname.split('/')[1]
+  else if (url.pathname === '/watch') id = url.searchParams.get('v')
+  else id = /^\/(?:embed|shorts|live|v)\/([^/]+)/.exec(url.pathname)?.[1]
+  return id && /^[\w-]{11}$/.test(id) ? id : null
+}
+
+/** Where a YouTube address starts the video, in seconds (t=90, t=1m30s, start=90), or 0. */
+export function youtubeStart(address: string): number {
+  let t = ''
+  try {
+    const url = new URL(address)
+    t = url.searchParams.get('t') ?? url.searchParams.get('start') ?? ''
+  } catch {
+    return 0
+  }
+  if (/^\d+s?$/.test(t)) return parseInt(t, 10)
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(t)
+  if (!t || !m) return 0
+  return Number(m[1] ?? 0) * 3600 + Number(m[2] ?? 0) * 60 + Number(m[3] ?? 0)
+}
+
+/** The name of the website in a web address, like "en.wikipedia.org" (without "www."). */
+export function siteName(address: string | undefined): string {
+  try {
+    return new URL(address ?? '').hostname.replace(/^www\./i, '')
+  } catch {
+    return ''
+  }
 }
 
 /** A copy that shares nothing with the board on the screen (for undo). */

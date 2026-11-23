@@ -100,6 +100,10 @@ const removeTitle = computed(() => {
 
     <template v-if="(card?.kind === 'link' || card?.kind === 'video') && card.url">
       <div class="w-px h-5 bg-[#1f1f1f] mx-0.5" />
+      <button class="btn btn-ghost btn-sm" :title="card.text ? 'Change its name' : 'Give it a name'" @click="emit('write')">
+        <PencilIcon :size="14" />
+        Name
+      </button>
       <button class="btn btn-ghost btn-sm" title="Open it in a new tab" @click="emit('openLink', card.url)">
         <ExternalLinkIcon :size="14" />
         Open
