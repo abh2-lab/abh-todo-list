@@ -16,14 +16,19 @@ import {
   Redo2Icon,
   TypeIcon,
   Undo2Icon,
+  UploadIcon,
   XIcon,
 } from '@lucide/vue'
 import {
   MAX_CARDS,
+  MAX_FILE_BYTES,
+  MAX_FILE_MB,
+  MAX_FILE_NAME,
   MAX_LABEL,
   MAX_LINES,
   MAX_TEXT,
   cleanWebAddress,
+  isBoardImage,
   newBoardId,
   type BoardCard,
   type BoardColor,
@@ -46,9 +51,12 @@ import {
   placesForNew,
   youtubeId,
 } from '~/lib/board'
+import { UploadError, fileUrl, uploadBoardFile, type UploadedFile } from '~/lib/boardFiles'
 import type { DocMeta, FullDoc } from '~/types/docs'
 import type { FullGroup, GroupNote } from '~/types/groups'
 import BoardLineEdge from './BoardLine.vue'
+import FileCard from './FileCard.vue'
+import ImageCard from './ImageCard.vue'
 import LinkCard from './LinkCard.vue'
 import LinkDialog from './LinkDialog.vue'
 import NoteCard from './NoteCard.vue'
@@ -492,7 +500,7 @@ function doneText(id: string, text: string | null) {
     if (before.trim()) tell('The empty card was deleted.', { undo: true })
     return
   }
-  // Link and video cards: their name (none = the web address shows).
+  // Link, video, picture and file cards: their name (none = the address or file name shows).
   if (text !== null) updateNodeData<BoardCard>(id, { text: text || undefined })
   changed()
 }
@@ -526,18 +534,156 @@ function onCanvasPointerLeave() {
   lastPointer = null
 }
 
-/** Ctrl+V on the board: a link becomes a link (or video) card, other words a text card. */
+/**
+ * Ctrl+V on the board: a link becomes a link (or video) card, other words a text card,
+ * and a picture (like a screenshot) or a copied file is uploaded.
+ */
 function onPaste(e: ClipboardEvent) {
   if (!loaded.value || pickerOpen.value || linkOpen.value) return
   const t = e.target as HTMLElement | null
   if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.closest?.('.board-reader'))) return
+  const at = lastPointer ? toBoard(lastPointer.x, lastPointer.y) : undefined
   const text = e.clipboardData?.getData('text/plain').trim() ?? ''
+  // Words come first: programs like Word also copy a picture of the words.
+  const files = text ? [] : [...(e.clipboardData?.files ?? [])]
+  if (files.length) {
+    e.preventDefault()
+    addFiles(files, at)
+    return
+  }
   if (!text) return
   e.preventDefault()
-  const at = lastPointer ? toBoard(lastPointer.x, lastPointer.y) : undefined
   const url = /^(https?:\/\/|www\.)\S+$/i.test(text) ? cleanWebAddress(text) : null
   if (url) addLink(url, '', at)
   else addText(at, text.slice(0, MAX_TEXT))
+}
+
+// ---- Pictures and files ----
+
+const fileInput = ref<HTMLInputElement | null>(null)
+/** Files waiting to be uploaded (one after the other), and where their cards go. */
+const uploadQueue: { file: File; at?: { x: number; y: number } }[] = []
+/** How many files are being uploaded now, how many are done, and how much of this one is sent (0 to 1). */
+const uploadCount = ref(0)
+const uploadDone = ref(0)
+const uploadPart = ref(0)
+const uploading = computed(() => uploadCount.value > 0)
+const uploadStop = new AbortController()
+let uploadRunning = false
+
+const uploadText = computed(() => {
+  const percent = `${Math.round(uploadPart.value * 100)}%`
+  return uploadCount.value > 1 ? `Uploading ${uploadDone.value + 1} of ${uploadCount.value}… ${percent}` : `Uploading… ${percent}`
+})
+
+function pickFiles() {
+  fileInput.value?.click()
+}
+
+function onFilesPicked() {
+  const input = fileInput.value
+  if (!input) return
+  const files = [...(input.files ?? [])]
+  input.value = ''
+  addFiles(files)
+}
+
+/** Upload pictures and files, and put a card for each one on the board (near `at`, or the middle). */
+function addFiles(files: File[], at?: { x: number; y: number }) {
+  if (!loaded.value || !files.length || !roomForCard()) return
+  const big = files.filter((f) => f.size > MAX_FILE_BYTES)
+  const ok = files.filter((f) => f.size > 0 && f.size <= MAX_FILE_BYTES)
+  if (big.length === 1) tell(`"${big[0]!.name}" is too big: a file can be at most ${MAX_FILE_MB} MB.`, { error: true })
+  else if (big.length > 1) tell(`${big.length} files are too big: a file can be at most ${MAX_FILE_MB} MB.`, { error: true })
+  // A dropped folder looks like an empty file.
+  else if (ok.length < files.length) tell('Folders and empty files can\'t be put on the board. For the files in a folder, open it and pick them.', { error: true })
+  for (const file of ok) uploadQueue.push({ file, at })
+  uploadCount.value += ok.length
+  void runUploads()
+}
+
+async function runUploads() {
+  if (uploadRunning) return
+  uploadRunning = true
+  while (uploadQueue.length && !uploadStop.signal.aborted && roomForCard()) {
+    const { file, at } = uploadQueue.shift()!
+    uploadPart.value = 0
+    try {
+      addFileCard(await uploadBoardFile(props.groupId, file, (part) => (uploadPart.value = part), uploadStop.signal), at)
+    } catch (e) {
+      if (e instanceof UploadError && e.status === -1) break
+      const why = e instanceof Error ? e.message : 'The file could not be uploaded.'
+      tell(uploadCount.value > 1 ? `${file.name}: ${why}` : why, { error: true })
+    }
+    uploadDone.value++
+  }
+  uploadQueue.length = 0
+  uploadCount.value = 0
+  uploadDone.value = 0
+  uploadPart.value = 0
+  uploadRunning = false
+}
+
+/** The card for an uploaded file: a picture card for pictures, a file card for the rest. */
+function addFileCard(f: UploadedFile, at?: { x: number; y: number }) {
+  const kind = isBoardImage(f.type) ? 'image' : 'file'
+  const w = CARD_WIDTH[kind]
+  const h = kind === 'image' ? 200 : 90
+  const c = at ?? viewCenter()
+  const p = freePlace({ x: c.x - w / 2, y: c.y - h / 2 }, w, h)
+  const card: BoardCard = {
+    id: newBoardId(),
+    kind,
+    x: p.x,
+    y: p.y,
+    fileId: f.id,
+    fileName: f.name.slice(0, MAX_FILE_NAME),
+    fileType: f.type,
+    fileSize: f.size,
+  }
+  addNodes([cardToNode(card)])
+  changed()
+}
+
+function openFile(card: BoardCard) {
+  if (card.fileId) window.open(fileUrl(card.fileId), '_blank', 'noopener,noreferrer')
+}
+
+/** Download without leaving the page (a link with "download", clicked). */
+function downloadFile(card: BoardCard) {
+  if (!card.fileId) return
+  const a = document.createElement('a')
+  a.href = fileUrl(card.fileId, true)
+  a.download = card.fileName ?? ''
+  a.click()
+}
+
+// Files dragged from the computer onto the board.
+const dropping = ref(false)
+
+function hasFiles(e: DragEvent) {
+  return !!e.dataTransfer?.types.includes('Files')
+}
+
+function onDragEnter(e: DragEvent) {
+  if (!hasFiles(e) || !loaded.value) return
+  e.preventDefault()
+  dropping.value = true
+}
+
+/** (On the whole page: a file dropped next to the board must not be opened by the browser instead.) */
+function onDragOver(e: DragEvent) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = dropping.value ? 'copy' : 'none'
+}
+
+function onDrop(e: DragEvent) {
+  if (!hasFiles(e)) return
+  e.preventDefault()
+  if (!dropping.value) return
+  dropping.value = false
+  addFiles([...(e.dataTransfer?.files ?? [])], toBoard(e.clientX, e.clientY))
 }
 
 /** Double-click on an empty place: a text card there. */
@@ -689,10 +835,10 @@ function toggleDashed() {
   changed()
 }
 
-/** Text card: write in it. Link and video cards: give them a name. */
+/** Text card: write in it. Link, video, picture and file cards: give them a name. */
 function writeSelected() {
   const n = getSelectedNodes.value[0]
-  if (n && ['text', 'link', 'video'].includes(n.data?.kind)) editText(n.id)
+  if (n && n.data?.kind !== 'note') editText(n.id)
 }
 
 function labelSelected() {
@@ -827,7 +973,7 @@ function onKeyDown(e: KeyboardEvent) {
 
 // ---- Leaving: save first ----
 function onBeforeUnload(e: BeforeUnloadEvent) {
-  if (changeNo === savedNo && !editingId.value && !editingLineId.value) return
+  if (changeNo === savedNo && !editingId.value && !editingLineId.value && !uploading.value) return
   void saveNow()
   e.preventDefault()
   e.returnValue = ''
@@ -838,6 +984,7 @@ function onVisibility() {
 }
 
 async function beforeLeave() {
+  if (uploading.value && !window.confirm('Some files are still uploading. Leave anyway? They will not be put on the board.')) return false
   // Writing in a card or on a line: keep what was written.
   ;(document.activeElement as HTMLElement | null)?.blur?.()
   await nextTick()
@@ -879,6 +1026,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibility)
   if (noticeTimer) clearTimeout(noticeTimer)
   if (saveTimer) clearTimeout(saveTimer)
+  uploadStop.abort()
 })
 
 function miniMapColor(n: GraphNode) {
@@ -891,7 +1039,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-black overflow-hidden">
+  <div class="flex flex-col h-screen bg-black overflow-hidden" @dragover="onDragOver" @drop="onDrop">
     <header class="flex items-center gap-3 px-4 h-12 border-b border-[#1f1f1f] bg-black shrink-0">
       <NuxtLink
         to="/"
@@ -930,6 +1078,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
       >
         {{ saveText }}
       </span>
+      <span v-if="uploading" class="text-2xs text-[#818cf8] shrink-0 tabular-nums" aria-live="polite">{{ uploadText }}</span>
       <span class="hidden lg:inline text-2xs text-[#333] shrink-0 select-none">Only you can see this board</span>
 
       <div class="flex-1" />
@@ -946,6 +1095,16 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
         <LinkIcon :size="14" />
         Link
       </button>
+      <button
+        class="btn btn-sm"
+        :disabled="!loaded"
+        title="Add pictures or files from your computer (or drag them onto the board, or paste a picture with Ctrl+V)"
+        @click="pickFiles"
+      >
+        <UploadIcon :size="14" />
+        File
+      </button>
+      <input ref="fileInput" type="file" multiple class="hidden" @change="onFilesPicked">
     </header>
 
     <div v-if="loadError" class="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6">
@@ -963,6 +1122,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
         @dblclick="onCanvasDblClick"
         @pointermove="onCanvasPointerMove"
         @pointerleave="onCanvasPointerLeave"
+        @dragenter="onDragEnter"
       >
         <VueFlow
           :id="flowId"
@@ -987,6 +1147,12 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
           </template>
           <template #node-video="p">
             <VideoCard v-bind="p" />
+          </template>
+          <template #node-image="p">
+            <ImageCard v-bind="p" />
+          </template>
+          <template #node-file="p">
+            <FileCard v-bind="p" />
           </template>
           <template #edge-board="p">
             <BoardLineEdge v-bind="p" />
@@ -1018,8 +1184,22 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
             @dashed="toggleDashed"
             @read="readingId = $event"
             @open-link="openLink"
+            @open-file="openFile"
+            @download-file="downloadFile"
             @remove="removeSelected"
           />
+        </div>
+
+        <!-- Files dragged over the board -->
+        <div
+          v-if="dropping"
+          class="absolute inset-0 z-30 flex items-center justify-center border-2 border-dashed border-[#6366f1]/70 bg-[#6366f1]/10"
+          @dragleave="dropping = false"
+        >
+          <div class="pointer-events-none flex items-center gap-2 px-4 py-2 rounded-lg border border-[#1f1f1f] bg-[#0b0b0b] text-sm text-[#ddd] shadow-2xl shadow-black">
+            <UploadIcon :size="16" class="text-[#818cf8]" />
+            Let go to put them on the board
+          </div>
         </div>
 
         <!-- Empty board -->
@@ -1028,8 +1208,8 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
             <NetworkIcon :size="28" class="mx-auto mb-3 text-[#2a2a2a]" />
             <p class="text-sm text-[#888]">This board is empty.</p>
             <p class="mt-1 text-xs leading-relaxed text-[#555]">
-              Add notes, text and links with the buttons at the top, double-click anywhere to write,
-              or copy a link and press Ctrl+V here.
+              Add notes, text, links and files with the buttons at the top. You can also double-click
+              anywhere to write, drag files here from your computer, or paste a link or a picture (Ctrl+V).
               Then drag a dot on a card's side to another card to join them with a line.
             </p>
           </div>
@@ -1116,6 +1296,10 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
 
 .board-card.is-selected {
   box-shadow: 0 0 0 2px #6366f1, 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+.board-card.is-picture {
+  padding: 6px;
 }
 
 .board-card.is-topic {

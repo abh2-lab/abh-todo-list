@@ -30,6 +30,10 @@ EXPOSE 3000
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
+# Pictures and files put on boards are kept here. docker-compose.yml puts a volume on this
+# folder, so they stay when the app is updated. The app (user "node") must be able to write in it.
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+
 # Run the app as the normal "node" user, not as root. If someone ever finds a way to run
 # code through the app, they can't change the app's files or the rest of the container.
 USER node

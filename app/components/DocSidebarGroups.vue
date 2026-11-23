@@ -89,7 +89,7 @@ async function finishRename() {
 }
 
 async function removeGroup(g: GroupMeta) {
-  if (!confirm(`Delete the group "${g.name}" and its board?\nThe notes in it are not deleted: they stay in your notes list.`)) return
+  if (!confirm(`Delete the group "${g.name}" and its board, with the pictures and files on it?\nThe notes in it are not deleted: they stay in your notes list.`)) return
   try {
     await deleteGroup(g.id)
   } catch {

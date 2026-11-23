@@ -13,6 +13,11 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - UPLOADS_DIR=/app/uploads
+    volumes:
+      # Pictures and files put on boards. The volume keeps them when the app is updated.
+      # Back it up together with the database.
+      - uploads:/app/uploads
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
@@ -20,3 +25,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+volumes:
+  uploads:

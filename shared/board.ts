@@ -30,7 +30,7 @@ export interface BoardCard {
   color?: BoardColor
   /** note: which note. */
   docId?: string
-  /** text: the words. link and video: a name for it. */
+  /** text: the words. link, video, image and file: a name for it. */
   text?: string
   /** text: "topic" = big and bold (like the middle of a mind map). */
   style?: 'topic'
@@ -70,7 +70,24 @@ export const MAX_URL = 2000
 export const MAX_FILE_NAME = 200
 const MAX_POS = 1_000_000
 const ID = /^[\w-]{1,64}$/
-const FILE_TYPE = /^[\w.+-]{1,60}\/[\w.+-]{1,100}$/
+/** A file type, like image/png or application/pdf. */
+export const FILE_TYPE = /^[\w.+-]{1,60}\/[\w.+-]{1,100}$/
+
+/** The biggest picture or file that can be put on a board. */
+export const MAX_FILE_MB = 25
+export const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024
+
+/** Pictures that are shown on the board (other files get a file card). */
+export const BOARD_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif']
+
+export function isBoardImage(type: string | undefined): boolean {
+  return BOARD_IMAGE_TYPES.includes(type ?? '')
+}
+
+/** Files the browser shows in a tab (pictures and PDFs). Other files are downloaded. */
+export function opensInBrowser(type: string | undefined): boolean {
+  return isBoardImage(type) || type === 'application/pdf'
+}
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -169,6 +186,8 @@ function cleanCard(value: unknown): BoardCard | null {
       if (typeof value.fileType === 'string' && FILE_TYPE.test(value.fileType)) card.fileType = value.fileType
       const size = Number(value.fileSize)
       if (Number.isInteger(size) && size >= 0 && size < 1e12) card.fileSize = size
+      const name = cleanText(value.text, MAX_LABEL)?.trim()
+      if (name) card.text = name
       break
     }
   }

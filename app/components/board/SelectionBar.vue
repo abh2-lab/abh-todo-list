@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ArrowRightIcon, BookOpenIcon, ExternalLinkIcon, HeadingIcon, MinusIcon, PencilIcon, Trash2Icon, TypeIcon } from '@lucide/vue'
-import { BOARD_COLORS, type BoardCard, type BoardColor, type BoardLine } from '#shared/board'
+import { ArrowRightIcon, BookOpenIcon, DownloadIcon, ExternalLinkIcon, HeadingIcon, MinusIcon, PencilIcon, Trash2Icon, TypeIcon } from '@lucide/vue'
+import { BOARD_COLORS, opensInBrowser, type BoardCard, type BoardColor, type BoardLine } from '#shared/board'
 import { COLORS } from '~/lib/board'
 
 // The bar at the top of the board for what is selected: colors, and what fits the card or line.
@@ -18,6 +18,8 @@ const emit = defineEmits<{
   dashed: []
   read: [docId: string]
   openLink: [url: string]
+  openFile: [card: BoardCard]
+  downloadFile: [card: BoardCard]
   remove: []
 }>()
 
@@ -107,6 +109,26 @@ const removeTitle = computed(() => {
       <button class="btn btn-ghost btn-sm" title="Open it in a new tab" @click="emit('openLink', card.url)">
         <ExternalLinkIcon :size="14" />
         Open
+      </button>
+    </template>
+
+    <template v-if="(card?.kind === 'image' || card?.kind === 'file') && card.fileId">
+      <div class="w-px h-5 bg-[#1f1f1f] mx-0.5" />
+      <button
+        class="btn btn-ghost btn-sm"
+        :title="card.kind === 'image' ? 'Write a few words under the picture' : card.text ? 'Change its name' : 'Give it a name'"
+        @click="emit('write')"
+      >
+        <PencilIcon :size="14" />
+        {{ card.kind === 'image' ? 'Words' : 'Name' }}
+      </button>
+      <button v-if="opensInBrowser(card.fileType)" class="btn btn-ghost btn-sm" title="Open it in a new tab (or double-click the card)" @click="emit('openFile', card)">
+        <ExternalLinkIcon :size="14" />
+        Open
+      </button>
+      <button class="btn btn-ghost btn-sm" title="Download it to your computer" @click="emit('downloadFile', card)">
+        <DownloadIcon :size="14" />
+        Download
       </button>
     </template>
 

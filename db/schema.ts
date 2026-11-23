@@ -92,6 +92,27 @@ export const groupNotes = pgTable('group_notes', {
   index('group_notes_doc_id_idx').on(t.docId),
 ])
 
+// Pictures and files put on a group's board. The file itself is in the uploads folder on the
+// server (UPLOADS_DIR, "uploads" by default), named by its id. Only its owner can open it.
+export const boardFiles = pgTable('board_files', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  groupId: text('group_id').notNull().references(() => noteGroups.id, { onDelete: 'cascade' }),
+  // The name it had on the computer it came from, like "lecture 3.pdf".
+  name: text('name').notNull(),
+  // What it is, like image/png. Pictures and PDFs are checked from their first bytes.
+  type: text('type').notNull(),
+  // Size in bytes.
+  size: integer('size').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  // Set = the file is not on its board any more (since then). It is kept for some days, so
+  // Ctrl+Z can still bring its card back, then deleted for good (server/plugins/clean-board-files.ts).
+  unusedSince: timestamp('unused_since'),
+}, (t) => [
+  index('board_files_group_id_idx').on(t.groupId),
+  index('board_files_user_id_idx').on(t.userId),
+])
+
 export type User = typeof users.$inferSelect
 export type Task = typeof tasks.$inferSelect
 export type Document = typeof documents.$inferSelect
