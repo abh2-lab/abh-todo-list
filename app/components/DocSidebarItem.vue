@@ -2,7 +2,7 @@
 import { FileTextIcon, LockIcon, Trash2Icon } from '@lucide/vue'
 import type { DocMeta } from '~/types/docs'
 
-// One note in the sidebar list. Long names are cut off with "…": hover a note to see its full name.
+// One note in the sidebar list. Long names use up to two lines, then "…": hover a note to see its full name.
 defineProps<{ doc: DocMeta; active: boolean }>()
 const emit = defineEmits<{ select: []; delete: [] }>()
 
@@ -53,7 +53,7 @@ function relativeTime(date: string | Date) {
     <!-- Title + date -->
     <div class="flex-1 min-w-0">
       <div
-        class="text-sm truncate leading-snug transition-colors"
+        class="text-sm line-clamp-2 break-words leading-snug transition-colors"
         :class="active ? 'text-[#f0f0f0] font-medium' : 'text-[#888] group-hover:text-[#ccc]'"
       >
         {{ doc.title || 'Untitled' }}

@@ -47,13 +47,108 @@ function openTrash() {
   emit('open-trash')
   emit('close')
 }
+
+// ---- The width of the list (computers and tablets; the phone menu keeps its own width) ----
+// Drag the right edge to make the list wider or narrower (or use the arrow keys on it).
+// Double-click the edge to go back to the normal width. The browser remembers the width.
+const NORMAL_WIDTH = 320
+const MIN_WIDTH = 240
+const MAX_WIDTH = 600
+const WIDTH_KEY = 'notes-list-width'
+
+function savedWidth(): number {
+  try {
+    const n = Number.parseInt(localStorage.getItem(WIDTH_KEY) ?? '', 10)
+    if (Number.isFinite(n)) return n
+  } catch {
+    // The browser does not let us read it: use the normal width.
+  }
+  return NORMAL_WIDTH
+}
+
+/** Never smaller than MIN_WIDTH, never bigger than MAX_WIDTH or 90% of the window. */
+function fitWidth(w: number): number {
+  return Math.round(Math.max(MIN_WIDTH, Math.min(w, MAX_WIDTH, window.innerWidth * 0.9)))
+}
+
+const width = useState('notes-list-width', savedWidth)
+const resizing = ref(false)
+
+function rememberWidth() {
+  try {
+    localStorage.setItem(WIDTH_KEY, String(width.value))
+  } catch {
+    // Not allowed: the width is kept only while the app is open.
+  }
+}
+
+function setWidth(w: number) {
+  width.value = fitWidth(w)
+  rememberWidth()
+}
+
+function startResize(e: PointerEvent) {
+  if (e.button !== 0) return
+  e.preventDefault()
+  const edge = e.currentTarget as HTMLElement
+  const startX = e.clientX
+  const startWidth = fitWidth(width.value)
+  edge.setPointerCapture(e.pointerId)
+  resizing.value = true
+  document.documentElement.classList.add('is-resizing')
+
+  const move = (ev: PointerEvent) => { width.value = fitWidth(startWidth + ev.clientX - startX) }
+  const stop = () => {
+    edge.removeEventListener('pointermove', move)
+    edge.removeEventListener('pointerup', stop)
+    edge.removeEventListener('pointercancel', stop)
+    document.documentElement.classList.remove('is-resizing')
+    resizing.value = false
+    rememberWidth()
+  }
+  edge.addEventListener('pointermove', move)
+  edge.addEventListener('pointerup', stop)
+  edge.addEventListener('pointercancel', stop)
+}
+
+function onEdgeKey(e: KeyboardEvent) {
+  if (e.key === 'ArrowLeft') setWidth(width.value - 16)
+  else if (e.key === 'ArrowRight') setWidth(width.value + 16)
+  else return
+  e.preventDefault()
+}
+
+onBeforeUnmount(() => document.documentElement.classList.remove('is-resizing'))
 </script>
 
 <template>
   <aside
     class="flex flex-col bg-[#080808] border-r border-[#1f1f1f] shadow-2xl shadow-black"
-    :class="wide ? 'w-72 max-w-[85vw]' : 'w-64'"
+    :class="wide ? 'w-72 max-w-[85vw]' : 'max-w-[90vw]'"
+    :style="wide ? undefined : { width: `${fitWidth(width)}px` }"
   >
+    <!-- Right edge: drag it to change the width (not in the phone menu) -->
+    <div
+      v-if="!wide"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Width of the notes list"
+      :aria-valuenow="fitWidth(width)"
+      :aria-valuemin="MIN_WIDTH"
+      :aria-valuemax="MAX_WIDTH"
+      tabindex="0"
+      class="group/edge absolute top-0 bottom-0 -right-1.5 z-10 w-3 cursor-col-resize outline-none"
+      title="Drag to make the list wider or narrower. Double-click: normal width."
+      @pointerdown="startResize"
+      @dblclick="setWidth(NORMAL_WIDTH)"
+      @keydown="onEdgeKey"
+    >
+      <div
+        class="mx-auto h-full w-0.5 transition-colors"
+        :class="resizing ? 'bg-[#6366f1]' : 'bg-transparent group-hover/edge:bg-[#6366f1]/60 group-focus-visible/edge:bg-[#6366f1]/60'"
+      />
+    </div>
+
     <!-- Phone: who is logged in + the parts of the app -->
     <slot name="top" />
 

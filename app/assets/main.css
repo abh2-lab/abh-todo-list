@@ -429,3 +429,10 @@
   .an-reveal { opacity: 1 !important; transform: none !important; }
   .an-anim { animation: none !important; }
 }
+
+/* While the notes list is made wider or narrower (dragging its edge): the resize
+   cursor everywhere, and no text gets selected by the drag. */
+.is-resizing, .is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
