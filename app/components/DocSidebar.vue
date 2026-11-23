@@ -184,8 +184,17 @@ onBeforeUnmount(() => document.documentElement.classList.remove('is-resizing'))
     </div>
 
     <template v-else>
-      <!-- My notes -->
+      <!-- Groups (not in the phone menu: boards are made for bigger screens), then My notes -->
       <div class="flex-1 min-h-0 overflow-y-auto py-1.5">
+        <DocSidebarGroups
+          v-if="!wide"
+          class="border-b border-[#161616] mb-1"
+          :docs="docs"
+          :active-id="activeId"
+          @select="pick"
+          @close="emit('close')"
+        />
+
         <div class="pl-4 pr-3 pt-3 pb-1.5 text-2xs text-[#555] select-none">
           <span class="font-semibold uppercase tracking-wider">My notes</span>
           <span class="text-[#333]"> · only you</span>

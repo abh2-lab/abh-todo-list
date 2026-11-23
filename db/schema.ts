@@ -1,4 +1,4 @@
-import { pgTable, text, json, timestamp, boolean, date, index } from 'drizzle-orm/pg-core'
+import { pgTable, text, json, timestamp, boolean, date, index, integer, primaryKey } from 'drizzle-orm/pg-core'
 
 // People who logged in with Google.
 export const users = pgTable('users', {
@@ -65,6 +65,32 @@ export const taskShares = pgTable('task_shares', {
   toMonth: date('to_month').notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 }, (t) => [index('task_shares_user_id_idx').on(t.userId)])
+
+// Groups of notes, like labels. Only their owner sees them. A note can be in many groups,
+// and it stays in "My notes" too. Each group has one board: a Mind map of its notes, with
+// text, links and files, and lines between them.
+export const noteGroups = pgTable('note_groups', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  // The board: its cards, lines and where they are (shared/board.ts). Saved as a whole.
+  board: json('board').notNull().default({}),
+  // Goes up by one at each save of the board. A save says which number it started from,
+  // so two tabs never write over each other's changes without knowing.
+  boardVersion: integer('board_version').notNull().default(0),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+}, (t) => [index('note_groups_user_id_idx').on(t.userId)])
+
+// Which notes are in which group.
+export const groupNotes = pgTable('group_notes', {
+  groupId: text('group_id').notNull().references(() => noteGroups.id, { onDelete: 'cascade' }),
+  docId: text('doc_id').notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  addedAt: timestamp('added_at').notNull().defaultNow(),
+}, (t) => [
+  primaryKey({ columns: [t.groupId, t.docId] }),
+  index('group_notes_doc_id_idx').on(t.docId),
+])
 
 export type User = typeof users.$inferSelect
 export type Task = typeof tasks.$inferSelect

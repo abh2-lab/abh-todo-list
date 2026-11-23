@@ -26,6 +26,8 @@ const emit = defineEmits<{
   'open-pending': []
 }>()
 
+const { loggedIn } = useUserSession()
+
 const editingTitle = ref(false)
 const titleInput = ref<HTMLInputElement | null>(null)
 const localTitle = ref(props.title)
@@ -148,6 +150,9 @@ function onTitleKeydown(e: KeyboardEvent) {
           <PencilIcon v-else :size="16" />
           <span class="hidden xl:inline">{{ viewMode ? 'Edit' : 'View' }}</span>
         </button>
+
+        <!-- Groups of notes (with a Mind map board each): logged in only -->
+        <GroupButton v-if="loggedIn" :doc-id="docId" />
 
         <ShareButton
           data-tour="share"
