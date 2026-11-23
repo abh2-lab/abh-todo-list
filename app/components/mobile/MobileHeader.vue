@@ -11,6 +11,8 @@ const props = defineProps<{
   docId: string | null
   isPrivate: boolean
   shared: boolean
+  /** The text of the open note (for "Copy for AI" in the Share menu). */
+  content: Record<string, any> | null
   pendingCount: number
   hidden?: boolean
 }>()
@@ -129,6 +131,8 @@ function onTitleKeydown(e: KeyboardEvent) {
         :doc-id="docId"
         :is-private="isPrivate"
         :shared="shared"
+        :title="title"
+        :content="content"
         @set-shared="emit('set-shared', $event)"
       />
 

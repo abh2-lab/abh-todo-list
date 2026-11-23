@@ -253,6 +253,7 @@ onBeforeUnmount(() => {
         :doc-id="activeDoc?.id ?? null"
         :is-private="activeDoc?.isPrivate ?? false"
         :shared="activeDoc?.shared ?? false"
+        :content="activeDoc ? editorContent : null"
         :pending-count="pendingCount"
         @update:title="updateTitle"
         @toggle-sidebar="sidebarOpen = !sidebarOpen"

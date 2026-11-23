@@ -61,8 +61,8 @@ export function tourSteps({ loggedIn, phone }: { loggedIn: boolean; phone: boole
       target: 'share',
       title: 'Share',
       text: loggedIn
-        ? 'For a private note: turn on a view-only link, so others can read the note but not change it. For a public note: copies its link.'
-        : 'Copies a link to this note, so others can open it.',
+        ? 'For a private note: turn on a view-only link, so others can read the note but not change it. For a public note: copy its link. "Copy for AI" copies the note as text, to paste into an AI chat.'
+        : 'Copy a link to this note, so others can open it. "Copy for AI" copies the note as text, to paste into an AI chat.',
     },
   )
 

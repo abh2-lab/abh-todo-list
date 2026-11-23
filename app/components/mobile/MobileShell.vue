@@ -139,6 +139,7 @@ watch(tour.open, (isOpen) => {
       :doc-id="activeDoc?.id ?? null"
       :is-private="activeDoc?.isPrivate ?? false"
       :shared="activeDoc?.shared ?? false"
+      :content="activeDoc ? editorContent : null"
       :pending-count="pendingCount"
       :hidden="headerHidden"
       @update:title="emit('update-title', $event)"
