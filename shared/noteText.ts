@@ -166,6 +166,26 @@ export function noteToMarkdown(content: unknown): string {
   return doc ? blocksMd(doc.content).join('\n\n').trim() : ''
 }
 
+/** The first words of a note, as plain text (for its card on a board). */
+export function notePreview(content: unknown, max = 240): string {
+  const doc = cleanNoteContent(content)
+  if (!doc) return ''
+  const words: string[] = []
+  let length = 0
+  const walk = (node: NoteNode) => {
+    if (length >= max) return
+    if (node.type === 'text' && node.text) {
+      words.push(node.text)
+      length += node.text.length
+    }
+    for (const child of node.content ?? []) walk(child)
+    if (node.type !== 'text') words.push(' ')
+  }
+  walk(doc)
+  const text = words.join('').replace(/\s+/g, ' ').trim()
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+}
+
 /** What "Copy for AI" copies: the name of the note, its view-only link, and the note as Markdown. */
 export function noteForAi(title: string, link: string, content: unknown): string {
   const name = title.trim().replace(/\s+/g, ' ') || 'Untitled'
