@@ -2,7 +2,7 @@
 import { NetworkIcon, PlusIcon, TagIcon } from '@lucide/vue'
 // "Groups" in the header (computers and tablets, logged in): put the open note in groups,
 // like labels, or take it out. A note can be in many groups and stays in "My notes".
-// Each group has a Mind map board: the icon next to a group's name opens it.
+// Each group has two boards (a Mind map and a Kanban): the icon next to a group's name opens them.
 const props = defineProps<{ docId: string | null }>()
 
 const { groups, loaded, loadGroups, createGroup, setInGroup } = useGroups()
@@ -71,7 +71,7 @@ async function addGroup() {
 
     <div v-if="menuOpen" class="menu-panel absolute right-0 top-full mt-2 z-50 w-72 text-left">
       <p class="text-xs text-[#888] leading-relaxed mb-2">
-        Put this note in groups. Only you see them. Each group has a Mind map board.
+        Put this note in groups. Only you see them. Each group has a Mind map and a Kanban board.
       </p>
 
       <div v-if="groups.length" class="max-h-64 overflow-y-auto -mx-1">

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { MonitorIcon } from '@lucide/vue'
 
-// The board of a group (a Mind map): /group/<id>. Only its owner can open it, and it is made
-// for computers and tablets (on a phone there is a short message instead).
+// The boards of a group: /group/<id> shows its Mind map (?view=map) or its Kanban (?view=kanban).
+// Without ?view it opens the one you used last for this group. Only its owner can open it, and
+// it is made for computers and tablets (on a phone there is a short message instead).
 const route = useRoute()
 const id = computed(() => String(route.params.id))
 const { loggedIn, loginUrl } = useAccount()
@@ -13,6 +14,33 @@ const ready = ref(false)
 onMounted(() => {
   ready.value = true
 })
+
+type View = 'map' | 'kanban'
+
+function lastView(groupId: string): View {
+  try {
+    return localStorage.getItem(`group-view:${groupId}`) === 'kanban' ? 'kanban' : 'map'
+  } catch {
+    return 'map'
+  }
+}
+
+const view = computed<View>(() => {
+  const asked = route.query.view
+  return asked === 'kanban' || asked === 'map' ? asked : lastView(id.value)
+})
+
+watch(
+  [id, view],
+  ([groupId, v]) => {
+    try {
+      localStorage.setItem(`group-view:${groupId}`, v)
+    } catch {
+      // No storage: the Mind map opens first next time.
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -31,5 +59,6 @@ onMounted(() => {
     <NuxtLink to="/" class="text-[#6366f1] text-sm hover:underline">Go to notes</NuxtLink>
   </div>
 
-  <BoardView v-else :key="id" :group-id="id" />
+  <BoardKanbanView v-else-if="view === 'kanban'" :key="`kanban-${id}`" :group-id="id" />
+  <BoardView v-else :key="`map-${id}`" :group-id="id" />
 </template>

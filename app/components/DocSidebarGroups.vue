@@ -4,7 +4,7 @@ import type { DocMeta } from '~/types/docs'
 import type { GroupMeta } from '~/types/groups'
 
 // "Groups" in the notes list (computers and tablets): notes put together by topic, like labels.
-// Click a group's name to open its Mind map board. The arrow shows the notes in it.
+// Click a group's name to open its boards (a Mind map and a Kanban). The arrow shows the notes in it.
 const props = defineProps<{
   docs: DocMeta[]
   activeId: string | null
@@ -114,7 +114,7 @@ async function removeGroup(g: GroupMeta) {
       </button>
       <button
         class="w-6 h-6 flex items-center justify-center rounded text-[#555] hover:text-[#f0f0f0] hover:bg-[#1a1a1a] transition-colors shrink-0"
-        title="New group (a Mind map board for some of your notes)"
+        title="New group (a Mind map and a Kanban board for some of your notes)"
         @click="startAdding"
       >
         <PlusIcon :size="14" />
@@ -138,7 +138,7 @@ async function removeGroup(g: GroupMeta) {
       <div v-if="problem" class="mx-4 my-1 text-xs text-[#fca5a5]" role="alert">{{ problem }}</div>
 
       <div v-if="groups.length === 0 && !adding" class="px-4 py-1.5 text-xs text-[#333] select-none leading-relaxed">
-        No groups yet. Click + to put notes together by topic and see them on a Mind map.
+        No groups yet. Click + to put notes together by topic and see them on a Mind map or a Kanban board.
       </div>
 
       <div v-for="g in groups" :key="g.id">

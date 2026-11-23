@@ -151,7 +151,7 @@ function onTitleKeydown(e: KeyboardEvent) {
           <span class="hidden xl:inline">{{ viewMode ? 'Edit' : 'View' }}</span>
         </button>
 
-        <!-- Groups of notes (with a Mind map board each): logged in only -->
+        <!-- Groups of notes (with a Mind map and a Kanban each): logged in only -->
         <GroupButton v-if="loggedIn" :doc-id="docId" />
 
         <ShareButton

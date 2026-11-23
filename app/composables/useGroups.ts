@@ -1,7 +1,7 @@
 import type { GroupMeta } from '~/types/groups'
 
 // Groups of notes (like labels; only you see them), for the notes list and the Groups button.
-// Each group has a Mind map board: /group/<id>.
+// Each group has two boards, a Mind map and a Kanban: /group/<id>.
 export function useGroups() {
   const groups = useState<GroupMeta[]>('note-groups', () => [])
   const loaded = useState('note-groups-loaded', () => false)
