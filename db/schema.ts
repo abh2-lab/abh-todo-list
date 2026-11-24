@@ -117,6 +117,24 @@ export const boardFiles = pgTable('board_files', {
   index('board_files_user_id_idx').on(t.userId),
 ])
 
+// Personal keys for AI apps (like Claude Code) that read and change your notes and groups
+// through the MCP connection (/mcp, server/routes/mcp.ts). You make a key in the app and paste
+// it into the AI app once. The AI app can then do what you can do: it acts as you.
+// Only a hash of the key is kept, so the key itself is shown just once, when it is made.
+// Deleting the row turns the key off.
+export const aiKeys = pgTable('ai_keys', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // A name to know it by, like "Claude Code on my laptop".
+  name: text('name').notNull(),
+  // SHA-256 of the whole key, in hex.
+  keyHash: text('key_hash').notNull().unique(),
+  // The first characters of the key, like "nk_Ab12", to tell keys apart in the list.
+  keyStart: text('key_start').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  lastUsedAt: timestamp('last_used_at'),
+}, (t) => [index('ai_keys_user_id_idx').on(t.userId)])
+
 export type User = typeof users.$inferSelect
 export type Task = typeof tasks.$inferSelect
 export type Document = typeof documents.$inferSelect
