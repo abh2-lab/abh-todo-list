@@ -1,24 +1,26 @@
 // What an AI app can do through the MCP connection (server/routes/mcp.ts): read, make and change
-// notes, delete them (after asking the user), and see and arrange groups.
+// notes, look at their pictures, delete notes (after asking the user), and see and arrange groups.
 // It acts as the person whose key it uses, with the same rules as the app: their own private
 // notes and the public notes, never other people's private notes.
 // Notes go to the AI as Markdown and come back as Markdown (server/mcp/markdown.ts).
 
 import { randomInt, randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { and, count, desc, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm'
-import { documents, groupNotes, noteGroups, tasks, type NewDocument } from '../../db/schema'
+import { boardFiles, documents, groupNotes, noteGroups, tasks, type NewDocument } from '../../db/schema'
 import { useDb } from '../db'
 import { cleanBoard, type CardContent } from '#shared/board'
 import { cleanKanban } from '#shared/kanban'
 import { withoutNul } from '#shared/text'
 import type { AiCaller } from '../utils/aiKeys'
+import { boardFilePath, isBoardFileId, sniffType } from '../utils/boardFiles'
 import { hideQueryValues } from '../utils/dbErrors'
 import { useDailyLimit } from '../utils/dailyLimit'
 import { MAX_GROUPS, MAX_GROUP_NOTES, cleanGroupName, ownGroup, previewFromJsonText } from '../utils/groups'
 import { markEditing } from '../utils/noteEditors'
 import { editableBy, freeNoteTitle, viewableBy } from '../utils/notes'
 import { noteTaskLines, syncNoteTasks } from '../utils/tasks'
-import { markdownAsNote, noteAsMarkdown } from './markdown'
+import { markdownAsNote, noteAsMarkdown, pastedPictures } from './markdown'
 
 /** The same count as making notes in the app (server/api/documents/index.post.ts). */
 const MAX_NEW_NOTES_A_DAY = 100
@@ -26,20 +28,30 @@ const MAX_NEW_NOTES_A_DAY = 100
 const MAX_MARKDOWN = 2_000_000
 const MAX_IDS = 100
 const DELETE_CODE_MS = 10 * 60 * 1000
+/**
+ * The biggest picture read_picture sends. AI apps refuse a picture over 5 MB once it is written
+ * as base64 (4 letters for every 3 bytes), so this is about 3.7 MB of picture.
+ */
+const MAX_PICTURE_BYTES = 3_700_000
+/** The kinds of pictures AI apps can look at, and their names. */
+const AI_PICTURE_TYPES = new Map([['image/png', 'PNG'], ['image/jpeg', 'JPEG'], ['image/gif', 'GIF'], ['image/webp', 'WebP']])
+/** The start of a pasted picture: data:image/…;base64, */
+const PASTED_DATA = /^data:image\/[\w.+-]+(?:;[\w.+-]+=[^;,]*)*;base64,/i
 
 const NOT_FOUND = 'There is no note with this id that the user can open. (list_notes gives the ids.)'
 const NOT_EDITABLE = 'There is no note with this id that the user can change. (list_notes gives the ids.)'
 const NO_GROUP = 'The user has no group with this id. (list_groups gives the ids.)'
+const NO_FILE = 'The user has no picture with this file_id. (read_group shows the file_id of each picture card.)'
 
 /** Told to the AI app when it connects. */
 export const INSTRUCTIONS = `This is the user's notes app. You act as the user.
 - Notes are Markdown here: read_note gives you a note as Markdown, and you send Markdown back.
 - Read a note before you change it. For most changes use edit_note with "edits" (old_text → new_text): everything you don't touch stays exactly as it was, like pictures, their sizes and tables.
 - New notes are private (only the user sees them). Public notes can be seen and changed by everyone who uses the app: make or change a public note only when the user asks.
-- Pasted pictures show as ![name](picture:1a2b3c4d). Keep that text as it is to keep the picture (you can move it or delete it). A new picture needs a web address: ![name](https://…).
+- Pasted pictures show as ![name](picture:1a2b3c4d). To look at one, call read_picture with the note_id and its key (here 1a2b3c4d). Keep that text as it is to keep the picture (you can move it or delete it). A new picture needs a web address: ![name](https://…).
 - A line ending with <!-- task:… --> is one of the user's Daily tasks. Keep the mark at the end of its line, even when you change the words. Don't make up new marks, and don't tick or untick their boxes (the app sets those from the task).
 - An empty line in a note shows as <br> on a line of its own. A YouTube video is @[youtube](https://www.youtube.com/watch?v=…) on a line of its own.
-- Groups are like labels: a note can be in many groups. Each group also has a Mind map and a Kanban board in the app (read_group shows them; you can't change them here).
+- Groups are like labels: a note can be in many groups. Each group also has a Mind map and a Kanban board in the app (read_group shows them, and read_picture shows their pictures; you can't change them here).
 - Never delete a note without asking the user first. delete_note moves it to the Trash, where it can be restored for 30 days.`
 
 type JsonSchema = Record<string, unknown>
@@ -52,8 +64,11 @@ export interface ToolDef {
   annotations: Record<string, unknown>
 }
 
+/** A part of a tool's answer: words, or a picture (base64) for the AI to look at. */
+export type ToolContent = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+
 export interface ToolResult {
-  content: { type: 'text'; text: string }[]
+  content: ToolContent[]
   isError?: boolean
 }
 
@@ -61,7 +76,8 @@ export interface ToolResult {
 class ToolError extends Error {}
 
 type Args = Record<string, unknown>
-type Handler = (args: Args, caller: AiCaller) => Promise<string>
+/** A tool's answer: words, or parts (words and pictures). */
+type Handler = (args: Args, caller: AiCaller) => Promise<string | ToolContent[]>
 
 const READ_ONLY = { readOnlyHint: true, openWorldHint: false }
 const CHANGES = { readOnlyHint: false, destructiveHint: false, openWorldHint: false }
@@ -102,6 +118,24 @@ export const TOOLS: ToolDef[] = [
         max_chars: { type: 'integer', minimum: 1000, maximum: 100000, description: 'At most this many characters. Default: 40000.' },
       },
       required: ['note_id'],
+      additionalProperties: false,
+    },
+    annotations: READ_ONLY,
+  },
+  {
+    name: 'read_picture',
+    title: 'Look at a picture',
+    description: 'Look at a picture, to see what is in it.\n'
+      + '- A picture pasted into a note: give note_id and picture, the key from ![name](picture:1a2b3c4d) in read_note (here 1a2b3c4d).\n'
+      + '- A picture card on a group\'s Mind map or Kanban: give file_id (read_group shows it).\n'
+      + 'Pictures with a web address (![name](https://…)) are not sent here: open their address yourself.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note_id: noteIdSchema,
+        picture: { type: 'string', description: 'The key of a pasted picture in that note, like 1a2b3c4d (picture:1a2b3c4d works too).' },
+        file_id: { type: 'string', description: 'The file_id of a picture card on a board (from read_group). Not with note_id.' },
+      },
       additionalProperties: false,
     },
     annotations: READ_ONLY,
@@ -254,6 +288,7 @@ export const TOOLS: ToolDef[] = [
 const HANDLERS: Record<string, Handler> = {
   list_notes: listNotes,
   read_note: readNote,
+  read_picture: readPicture,
   create_note: createNote,
   edit_note: editNote,
   delete_note: deleteNote,
@@ -274,8 +309,8 @@ export async function callTool(name: string, args: unknown, caller: AiCaller): P
   if (!hasTool(name)) return { content: [{ type: 'text', text: `There is no tool called ${quote(String(name))}.` }], isError: true }
   const input: Args = args && typeof args === 'object' && !Array.isArray(args) ? (args as Args) : {}
   try {
-    const text = await HANDLERS[name]!(input, caller)
-    return { content: [{ type: 'text', text }] }
+    const answer = await HANDLERS[name]!(input, caller)
+    return { content: typeof answer === 'string' ? [{ type: 'text', text: answer }] : answer }
   } catch (e) {
     let message: string
     const status = (e as { statusCode?: number } | null)?.statusCode
@@ -464,6 +499,7 @@ async function readNote(args: Args, caller: AiCaller): Promise<string> {
   if (!doc) throw new ToolError(NOT_FOUND)
 
   const { markdown } = noteAsMarkdown(doc.content)
+  const pictures = pastedPictures(doc.content).size
   const groups = (await groupsOf([doc.id], userId)).get(doc.id) ?? []
   if (doc.userId === null || doc.userId === userId) remember(caller.keyId, doc.id, doc.updatedAt)
 
@@ -476,6 +512,9 @@ async function readNote(args: Args, caller: AiCaller): Promise<string> {
     `- groups: ${groups.length ? groups.map((g) => `${quote(g.name)} (group_id: ${g.id})`).join(', ') : 'none'}`,
     `- length: ${markdown.length} characters`,
   ]
+  if (pictures) {
+    lines.push(`- pictures: ${plural(pictures, 'pasted picture')}. To look at one, call read_picture with this note_id and its key (picture:<key> in the note).`)
+  }
   if (!markdown) {
     lines.push('', 'The note is empty.')
   } else if (offset >= markdown.length) {
@@ -758,6 +797,7 @@ async function readGroup(args: Args, caller: AiCaller): Promise<string> {
   const trashed = notes.filter((n) => n.deletedAt)
   const titles = new Map(notes.map((n) => [n.id, n.title]))
   const inTrash = new Set(trashed.map((n) => n.id))
+  let pictureCards = false
   const cardName = (card: CardContent): string | null => {
     switch (card.kind) {
       case 'note': {
@@ -772,7 +812,8 @@ async function readGroup(args: Args, caller: AiCaller): Promise<string> {
       case 'video':
         return `video ${card.text ? `${quote(card.text)} ` : ''}${card.url ?? ''}`.trim()
       case 'image':
-        return `picture ${quote(card.text || card.fileName || 'picture')}`
+        if (card.fileId) pictureCards = true
+        return `picture ${quote(card.text || card.fileName || 'picture')}${card.fileId ? ` (file_id: ${card.fileId})` : ''}`
       case 'file':
         return `file ${quote(card.text || card.fileName || 'file')}`
     }
@@ -809,7 +850,89 @@ async function readGroup(args: Args, caller: AiCaller): Promise<string> {
   }
   lines.push('', 'You can\'t change the Mind map or the Kanban here, only which notes are in the group. '
     + 'A note put in the group gets a card on both boards when they are opened in the app.')
+  if (pictureCards) lines.push('To look at a picture card, call read_picture with its file_id.')
   return lines.join('\n')
+}
+
+// ---- Pictures ----
+
+function sizeText(bytes: number): string {
+  return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`
+}
+
+function tooBig(name: string, bytes: number): ToolError {
+  return new ToolError(`The picture ${quote(name)} is too big to send to an AI app: ${sizeText(bytes)} (the most is ${sizeText(MAX_PICTURE_BYTES)}). `
+    + 'If the user puts a smaller copy of it in, you can look at that one.')
+}
+
+function cannotShow(name: string): ToolError {
+  return new ToolError(`The picture ${quote(name)} can't be sent: AI apps can only look at PNG, JPEG, GIF and WebP pictures, and this is another kind.`)
+}
+
+/** A picture from a note or a board, for the AI to look at (as an image in the answer). */
+async function readPicture(args: Args, caller: AiCaller): Promise<ToolContent[]> {
+  const userId = caller.user.id
+  const given = (key: string) => args[key] !== undefined && args[key] !== null
+  if (given('file_id') === given('note_id')) {
+    throw new ToolError('Give note_id and picture (a picture pasted into a note), or file_id (a picture card on a board), not both.')
+  }
+
+  let name: string
+  let from: string
+  let data: Buffer
+  if (given('note_id')) {
+    const noteId = idOf(args, 'note_id', NOT_FOUND)
+    const asked = text(args, 'picture', { max: 200 })?.trim()
+    if (!asked) throw new ToolError('picture is needed: the key of the picture, like 1a2b3c4d from picture:1a2b3c4d in read_note.')
+    const key = /^(?:picture:)?([0-9a-f]{8})$/i.exec(asked)?.[1]?.toLowerCase()
+    if (!key) throw new ToolError('picture must be the key of a pasted picture, like 1a2b3c4d: the 8 letters after picture: in read_note.')
+    const [doc] = await useDb()
+      .select({ title: documents.title, content: documents.content })
+      .from(documents)
+      .where(and(eq(documents.id, noteId), viewableBy(userId)))
+    if (!doc) throw new ToolError(NOT_FOUND)
+    const node = pastedPictures(doc.content).get(key)
+    if (!node) throw new ToolError(`There is no picture:${key} in the note ${nameOf(doc.title)}. Read the note again with read_note: it shows the key of each picture.`)
+
+    const alt = typeof node.attrs?.alt === 'string' ? node.attrs.alt.replace(/\s+/g, ' ').trim() : ''
+    name = alt || `picture:${key}`
+    from = `the note ${nameOf(doc.title)}`
+    const src = String(node.attrs?.src ?? '').trim()
+    const start = PASTED_DATA.exec(src)
+    if (!start) throw cannotShow(name)
+    // Checked before it is read: base64 has 4 letters for every 3 bytes.
+    const bytes = Math.floor((src.length - start[0].length) * 3 / 4)
+    if (bytes > MAX_PICTURE_BYTES + 3) throw tooBig(name, bytes)
+    data = Buffer.from(src.slice(start[0].length), 'base64')
+  } else {
+    const fileId = text(args, 'file_id', { max: 200 })!.trim().toLowerCase()
+    if (!isBoardFileId(fileId)) throw new ToolError(NO_FILE)
+    const [file] = await useDb()
+      .select({ name: boardFiles.name, type: boardFiles.type, size: boardFiles.size, group: noteGroups.name })
+      .from(boardFiles)
+      .innerJoin(noteGroups, eq(noteGroups.id, boardFiles.groupId))
+      .where(and(eq(boardFiles.id, fileId), eq(boardFiles.userId, userId)))
+    if (!file) throw new ToolError(NO_FILE)
+    name = file.name
+    from = `the board of the group ${quote(file.group)}`
+    if (!AI_PICTURE_TYPES.has(file.type)) throw cannotShow(name)
+    if (file.size > MAX_PICTURE_BYTES) throw tooBig(name, file.size)
+    try {
+      data = await readFile(boardFilePath(fileId))
+    } catch {
+      throw new ToolError(`The picture ${quote(name)} is missing on the server, so it can't be sent.`)
+    }
+  }
+
+  // Only real pictures, from their first bytes: never something that only says it is one.
+  const type = sniffType(data)
+  const kind = type ? AI_PICTURE_TYPES.get(type) : undefined
+  if (!type || !kind) throw cannotShow(name)
+  if (data.length > MAX_PICTURE_BYTES) throw tooBig(name, data.length)
+  return [
+    { type: 'text', text: `The picture ${quote(name)} from ${from} (${kind}, ${sizeText(data.length)}):` },
+    { type: 'image', data: data.toString('base64'), mimeType: type },
+  ]
 }
 
 async function createGroup(args: Args, caller: AiCaller): Promise<string> {

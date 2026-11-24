@@ -6,8 +6,9 @@
 //   it did not change keeps the exact part it came from (with all its settings, like picture
 //   sizes or table column widths). Only changed or new pieces are made from the Markdown.
 // - Pictures pasted into a note are big, so the AI sees them as ![name](picture:1a2b3c4d). The
-//   placeholder keeps the picture when the AI sends it back. Pictures from the web keep their
-//   address. YouTube videos look like @[youtube](https://…).
+//   placeholder keeps the picture when the AI sends it back, and the read_picture tool shows the
+//   AI the picture itself (server/mcp/tools.ts). Pictures from the web keep their address.
+//   YouTube videos look like @[youtube](https://…).
 // - A line that is a Daily task ends with <!-- task:<id> -->, so the line stays linked to its
 //   task when the AI changes the line.
 // - An empty line in a note is <br> on a line of its own.
@@ -50,6 +51,22 @@ export function noteAsMarkdown(content: unknown): NoteMarkdown {
   const doc = cleanNoteContent(content)
   const blocks = (doc?.content ?? []).map((node) => ({ md: blockMd(node), node }))
   return { blocks, markdown: blocks.map((b) => b.md).join('\n\n') }
+}
+
+/** The pasted pictures of a note (not the ones from a web address), by the key the AI sees: picture:<key>. */
+export function pastedPictures(content: unknown): Map<string, NoteNode> {
+  const out = new Map<string, NoteNode>()
+  const walk = (node: NoteNode) => {
+    const src = typeof node.attrs?.src === 'string' ? node.attrs.src.trim() : ''
+    if (node.type === 'image' && src && !/^https?:\/\//i.test(src)) {
+      const key = pictureKey(src)
+      if (!out.has(key)) out.set(key, node)
+    }
+    for (const child of node.content ?? []) walk(child)
+  }
+  const doc = cleanNoteContent(content)
+  if (doc) walk(doc)
+  return out
 }
 
 function taskMark(node: NoteNode): string {
