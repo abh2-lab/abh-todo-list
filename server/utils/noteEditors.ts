@@ -46,14 +46,22 @@ export function firstName(name: string | null | undefined): string | null {
   return first ? first.slice(0, 40) : null
 }
 
-/** This tab just saved a change to the note. */
-export function markEditing(docId: string, tab: string, user: { id: string; name?: string } | null | undefined) {
+/**
+ * This tab just saved a change to the note. `label`: the name to show instead of the person's
+ * first name (an AI app saving through the MCP connection shows as "AI (<key name>)").
+ */
+export function markEditing(
+  docId: string,
+  tab: string,
+  user: { id: string; name?: string } | null | undefined,
+  label?: string,
+) {
   const now = Date.now()
   sweep(now)
   let tabs = notes.get(docId)
   if (!tabs) notes.set(docId, (tabs = new Map()))
   tabs.delete(tab) // so it moves to the end (the newest)
-  tabs.set(tab, { userId: user?.id ?? null, name: firstName(user?.name), at: now })
+  tabs.set(tab, { userId: user?.id ?? null, name: label?.slice(0, 40) ?? firstName(user?.name), at: now })
   // Too many tabs on one note: forget the ones that saved longest ago.
   for (const old of tabs.keys()) {
     if (tabs.size <= MAX_TABS_PER_NOTE) break
