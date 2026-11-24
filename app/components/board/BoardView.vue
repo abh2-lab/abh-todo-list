@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ConnectionMode, VueFlow, useVueFlow, type GraphEdge, type GraphNode } from '@vue-flow/core'
+import { ConnectionMode, SelectionMode, VueFlow, useVueFlow, type GraphEdge, type GraphNode } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import '@vue-flow/node-resizer/dist/style.css'
 import '~/assets/board.css'
-import { MaximizeIcon, MinusIcon, NetworkIcon, PlusIcon, Redo2Icon, Undo2Icon, UploadIcon } from '@lucide/vue'
+import { HandIcon, MaximizeIcon, MinusIcon, MousePointer2Icon, NetworkIcon, PlusIcon, Redo2Icon, Undo2Icon, UploadIcon } from '@lucide/vue'
 import {
   MAX_CARDS,
   MAX_FILE_NAME,
@@ -74,6 +74,7 @@ const {
   addEdges,
   addNodes,
   addSelectedEdges,
+  addSelectedElements,
   findEdge,
   findNode,
   fitView,
@@ -82,6 +83,7 @@ const {
   getSelectedEdges,
   getSelectedNodes,
   getViewport,
+  nodesSelectionActive,
   onConnect,
   onConnectEnd,
   onConnectStart,
@@ -126,6 +128,40 @@ const linkOpen = ref(false)
 const connecting = ref(false)
 
 usePageTitle(() => name.value || 'Board')
+
+// ---- Arrow and Hand ----
+// Arrow (V): drag on an empty place to select cards (a box), drag cards to move them, Delete to
+// delete them. Hand (H): drag anywhere to move around the board; cards can't be changed.
+// Hold Space for the hand for a moment. The middle (or right) mouse button and the map in the
+// corner move around the board in both.
+type Tool = 'arrow' | 'hand'
+const TOOL_KEY = 'board-tool'
+/** Mouse buttons that move around the board with the arrow: middle and right. */
+const PAN_BUTTONS = [1, 2]
+/** Hold one of these and click cards to select more than one. */
+const MORE_KEYS = ['Shift', 'Control', 'Meta']
+const tool = ref<Tool>('arrow')
+const spaceHeld = ref(false)
+const handActive = computed(() => tool.value === 'hand' || spaceHeld.value)
+
+function setTool(t: Tool) {
+  if (tool.value === t) return
+  tool.value = t
+  // Nothing can be selected with the hand.
+  if (t === 'hand') removeSelectedElements()
+  try {
+    localStorage.setItem(TOOL_KEY, t)
+  } catch {
+    // No storage: the arrow next time.
+  }
+}
+
+function holdSpace(on: boolean) {
+  if (spaceHeld.value === on) return
+  spaceHeld.value = on
+  // The box around selected cards would catch the drag (and move them).
+  if (on) nodesSelectionActive.value = false
+}
 
 // ---- The board as data ----
 
@@ -467,7 +503,7 @@ function onDrop(e: DragEvent) {
 /** Double-click on an empty place: a text card there. */
 function onCanvasDblClick(e: MouseEvent) {
   const t = e.target as HTMLElement | null
-  if (!t?.closest('.vue-flow__pane') || t.closest('.vue-flow__node, .vue-flow__edge, .vue-flow__minimap, .board-line-label')) return
+  if (handActive.value || !t?.closest('.vue-flow__pane') || t.closest('.vue-flow__node, .vue-flow__edge, .vue-flow__minimap, .board-line-label')) return
   addText(toBoard(e.clientX, e.clientY))
 }
 
@@ -560,7 +596,9 @@ function selectLine(id: string) {
   addSelectedEdges([edge])
 }
 
-onEdgeDoubleClick(({ edge }) => editLabel(edge.id))
+onEdgeDoubleClick(({ edge }) => {
+  if (!handActive.value) editLabel(edge.id)
+})
 
 // ---- Moving and resizing ----
 onNodeDragStop(() => changed())
@@ -676,7 +714,17 @@ function onKeyDown(e: KeyboardEvent) {
   const key = e.key.toLowerCase()
   const mod = e.ctrlKey || e.metaKey
   const anySelected = getSelectedNodes.value.length > 0 || getSelectedEdges.value.length > 0
-  if (mod && key === 'z' && !e.shiftKey) {
+  if (e.code === 'Space' && !mod && (spaceHeld.value || lastPointer)) {
+    // Hold Space (with the mouse on the board) to move around it. Not a click on a button.
+    e.preventDefault()
+    holdSpace(true)
+  } else if (!mod && !e.altKey && !e.shiftKey && (key === 'v' || key === 'h')) {
+    setTool(key === 'v' ? 'arrow' : 'hand')
+  } else if (mod && key === 'a' && !e.shiftKey && !e.altKey && !handActive.value) {
+    // Select every card and line.
+    e.preventDefault()
+    addSelectedElements([...getNodes.value, ...getEdges.value])
+  } else if (mod && key === 'z' && !e.shiftKey) {
     e.preventDefault()
     undo()
   } else if (mod && (key === 'y' || (key === 'z' && e.shiftKey))) {
@@ -689,6 +737,17 @@ function onKeyDown(e: KeyboardEvent) {
     if (anySelected) removeSelectedElements()
     else readingId.value = null
   }
+}
+
+function onKeyUp(e: KeyboardEvent) {
+  if (e.code !== 'Space' || !spaceHeld.value) return
+  e.preventDefault()
+  holdSpace(false)
+}
+
+/** (Space let go in another window.) */
+function onWindowBlur() {
+  holdSpace(false)
 }
 
 // ---- Leaving: save first ----
@@ -705,16 +764,30 @@ provide(BOARD_CONTEXT, {
   read: (docId) => {
     readingId.value = docId
   },
-  editText,
+  // (A double-click or a click on the board. With the hand, nothing changes.)
+  editText: (id) => {
+    if (!handActive.value) editText(id)
+  },
   doneText,
-  editLabel,
+  editLabel: (id) => {
+    if (!handActive.value) editLabel(id)
+  },
   doneLabel,
-  selectLine,
+  selectLine: (id) => {
+    if (!handActive.value) selectLine(id)
+  },
   resized,
 })
 
 onMounted(() => {
+  try {
+    if (localStorage.getItem(TOOL_KEY) === 'hand') tool.value = 'hand'
+  } catch {
+    // No storage: the arrow.
+  }
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  window.addEventListener('blur', onWindowBlur)
   window.addEventListener('paste', onPaste)
   window.addEventListener('pointerdown', onPointerDown, true)
   void load()
@@ -722,6 +795,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+  window.removeEventListener('blur', onWindowBlur)
   window.removeEventListener('paste', onPaste)
   window.removeEventListener('pointerdown', onPointerDown, true)
 })
@@ -767,7 +842,7 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
       <div
         ref="canvas"
         class="board-canvas relative flex-1 min-w-0"
-        :class="{ 'is-connecting': connecting }"
+        :class="{ 'is-connecting': connecting, 'is-hand': handActive }"
         @dblclick="onCanvasDblClick"
         @pointermove="onCanvasPointerMove"
         @pointerleave="onCanvasPointerLeave"
@@ -779,6 +854,14 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
           :connection-radius="28"
           :connection-line-options="{ style: { stroke: '#818cf8', strokeWidth: 2 } }"
           :delete-key-code="null"
+          :pan-on-drag="handActive ? true : PAN_BUTTONS"
+          :pan-activation-key-code="null"
+          :selection-key-code="handActive ? null : true"
+          :selection-mode="SelectionMode.Partial"
+          :multi-selection-key-code="MORE_KEYS"
+          :nodes-draggable="!handActive"
+          :nodes-connectable="!handActive"
+          :elements-selectable="!handActive"
           :zoom-on-double-click="false"
           :disable-keyboard-a11y="true"
           :min-zoom="MIN_ZOOM"
@@ -864,8 +947,29 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
           </div>
         </div>
 
-        <!-- Zoom and undo -->
+        <!-- Arrow and hand, zoom, and undo -->
         <div class="absolute bottom-4 left-4 z-10 flex items-center gap-1 px-1 py-1 rounded-lg border border-[#1f1f1f] bg-[#0b0b0b]/95">
+          <div class="flex items-center gap-0.5" role="group" aria-label="Mouse mode">
+            <button
+              class="board-tool"
+              :class="{ 'is-on': tool === 'arrow' }"
+              title="Arrow (V): drag on an empty place to select cards, drag cards to move them"
+              :aria-pressed="tool === 'arrow'"
+              @click="setTool('arrow'); ($event.currentTarget as HTMLElement).blur()"
+            >
+              <MousePointer2Icon :size="14" />
+            </button>
+            <button
+              class="board-tool"
+              :class="{ 'is-on': tool === 'hand' }"
+              title="Hand (H): drag anywhere to move around the board. Or hold Space."
+              :aria-pressed="tool === 'hand'"
+              @click="setTool('hand'); ($event.currentTarget as HTMLElement).blur()"
+            >
+              <HandIcon :size="14" />
+            </button>
+          </div>
+          <div class="w-px h-5 bg-[#1f1f1f] mx-0.5" />
           <button class="btn btn-ghost btn-sm !px-1.5" title="Zoom out" @click="zoomOut({ duration: 150 })">
             <MinusIcon :size="14" />
           </button>
@@ -887,7 +991,8 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
 
         <!-- How to use it -->
         <p class="absolute bottom-5 left-1/2 -translate-x-1/2 z-[5] hidden xl:block text-2xs text-[#3a3a3a] select-none pointer-events-none whitespace-nowrap">
-          Drag a card's dot to draw a line · Double-click a line to write on it · Shift+drag to select many
+          <template v-if="tool === 'hand'">Drag anywhere to move around the board · Press V for the arrow, to select and move cards</template>
+          <template v-else>Drag on an empty place to select cards · Hold Space and drag to move around · Drag a card's dot to draw a line</template>
         </p>
 
         <NoticeBar :notice="notice" :can-undo="canUndo" @undo="undo" @close="notice = null" />
@@ -1001,5 +1106,57 @@ const isEmpty = computed(() => loaded.value && getNodes.value.length === 0)
   border: 1px solid #1f1f1f;
   border-radius: 8px;
   background: #0b0b0b;
+}
+
+/* The arrow and the hand (bottom left). */
+.board-tool {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #666;
+  transition: color 0.12s, background-color 0.12s;
+}
+
+.board-tool:hover {
+  color: #ccc;
+}
+
+.board-tool.is-on {
+  background: #1a1a1a;
+  color: #818cf8;
+}
+
+/* With the arrow, an empty place is for drawing a box: the normal mouse arrow there. */
+.board-canvas .vue-flow__pane.selection {
+  cursor: default;
+}
+
+.board-canvas .vue-flow__pane.dragging {
+  cursor: grabbing;
+}
+
+/* With the hand, drag anywhere to move around. The dots, the edges for resizing and the words
+   on lines do nothing then. */
+.board-canvas.is-hand .vue-flow__node,
+.board-canvas.is-hand .vue-flow__edge {
+  cursor: grab;
+}
+
+.board-canvas.is-hand .vue-flow__pane.dragging .vue-flow__node,
+.board-canvas.is-hand .vue-flow__pane.dragging .vue-flow__edge {
+  cursor: grabbing;
+}
+
+.board-canvas.is-hand .vue-flow__node .board-handle,
+.board-canvas.is-hand .board-resize,
+.board-canvas.is-hand .board-line-label {
+  pointer-events: none;
+}
+
+.board-canvas.is-hand .vue-flow__node .board-handle {
+  opacity: 0;
 }
 </style>
