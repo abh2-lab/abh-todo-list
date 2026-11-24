@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BellIcon, CalendarDaysIcon, CircleHelpIcon, FileTextIcon, LogInIcon } from '@lucide/vue'
+import { BellIcon, BotIcon, CalendarDaysIcon, CircleHelpIcon, FileTextIcon, LogInIcon } from '@lucide/vue'
 import type { AppView } from '~/types/docs'
 
 // Center of the header: who is logged in, and the parts of the app.
@@ -19,6 +19,13 @@ const { start: startTour } = useTour()
 const menuOpen = ref(false)
 const menuRoot = ref<HTMLElement | null>(null)
 useClickOutside(menuRoot, () => { menuOpen.value = false })
+
+// "AI connections": keys for AI apps like Claude Code.
+const aiOpen = ref(false)
+function openAi() {
+  menuOpen.value = false
+  aiOpen.value = true
+}
 </script>
 
 <template>
@@ -44,9 +51,14 @@ useClickOutside(menuRoot, () => { menuOpen.value = false })
               <div class="text-xs text-[#666] truncate">{{ user.email }}</div>
             </div>
           </div>
+          <button class="btn w-full mb-2" title="Let AI apps like Claude Code read and change your notes" @click="openAi">
+            <BotIcon :size="15" />
+            AI connections
+          </button>
           <button class="btn w-full" @click="logout">Log out</button>
         </div>
       </div>
+      <AiConnectionsDialog :open="aiOpen" @close="aiOpen = false" />
 
       <div class="w-px h-5 bg-[#1f1f1f] mx-1 shrink-0" />
 

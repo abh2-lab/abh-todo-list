@@ -15,6 +15,9 @@ const emit = defineEmits<{
 }>()
 
 const { loggedIn, user, logout, loginUrl } = useAccount()
+
+// "AI connections": keys for AI apps like Claude Code.
+const aiOpen = ref(false)
 </script>
 
 <template>
@@ -51,7 +54,11 @@ const { loggedIn, user, logout, loginUrl } = useAccount()
         <button class="nav-btn border border-[#1f1f1f]" title="A short tour of the app" @click="emit('open-help')">
           Help
         </button>
+        <button class="nav-btn border border-[#1f1f1f]" title="Let AI apps like Claude Code read and change your notes" @click="aiOpen = true">
+          AI connections
+        </button>
       </div>
+      <AiConnectionsDialog :open="aiOpen" @close="aiOpen = false" />
     </template>
 
     <template v-else>
