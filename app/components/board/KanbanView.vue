@@ -943,7 +943,7 @@ onBeforeUnmount(() => {
   min-height: 0;
   border: 1px solid #1a1a1a;
   border-top-width: 3px;
-  border-radius: 12px;
+  border-radius: 0;
   background: #070707;
   transition: background-color 0.12s, border-color 0.12s;
 }
@@ -1028,7 +1028,7 @@ onBeforeUnmount(() => {
 .kanban-empty {
   padding: 18px 12px;
   border: 1px dashed #1f1f1f;
-  border-radius: 10px;
+  border-radius: 0;
   color: #444;
   font-size: 12px;
   line-height: 1.5;
@@ -1051,7 +1051,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 8px;
   border: 1px dashed #1f1f1f;
-  border-radius: 12px;
+  border-radius: 0;
   color: #555;
   font-size: 13px;
   transition: color 0.12s, border-color 0.12s;
