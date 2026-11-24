@@ -5,9 +5,11 @@
 // note as before.
 // Same rules as the app: only a note this visitor may read (public notes, private notes with
 // the view-only link on, and your own notes), never a note in the Trash.
+// Pasted pictures are links to the pictures (shared/notePictures.ts), so AI tools can open them.
 import { and, eq } from 'drizzle-orm'
 import { documents } from '../../db/schema'
 import { useDb } from '../db'
+import { notePicturePath } from '#shared/notePictures'
 import { escapeHtml, noteToHtml } from '#shared/noteText'
 
 const NOTE_PAGE = /^\/doc\/([^/]+)\/?$/
@@ -33,9 +35,15 @@ export default defineNitroPlugin((nitroApp) => {
 
       const title = escapeHtml(doc.title.trim() || 'Untitled')
       const edited = doc.updatedAt.toISOString().slice(0, 10)
+      // This site's address, as the visitor sees it (Coolify's proxy says it was https).
+      const site = getRequestURL(event, { xForwardedHost: true, xForwardedProto: true }).origin
+      const pictureAddress = (src: string) => {
+        const path = notePicturePath(id, src)
+        return path && `${site}${path}`
+      }
       html.head.push(`<title>${title}</title>`, '<style>.note-text-for-ai{display:none}</style>')
       html.bodyPrepend.push(
-        `<article class="note-text-for-ai"><h1>${title}</h1><p>Last edited: ${edited}</p>${noteToHtml(doc.content)}</article>`,
+        `<article class="note-text-for-ai"><h1>${title}</h1><p>Last edited: ${edited}</p>${noteToHtml(doc.content, pictureAddress)}</article>`,
       )
     } catch (e) {
       // The note can't be read now: the page works as before (the app loads the note itself).

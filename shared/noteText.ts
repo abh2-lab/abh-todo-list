@@ -3,10 +3,32 @@
 // - noteToHtml: the view-only page (/doc/<id>) carries this copy of the note, so AI tools
 //   that read a page without running its JavaScript still get the text
 //   (server/plugins/note-text-for-ai.ts).
-// The note is cleaned first (shared/noteContent.ts). Pictures pasted into a note are big,
-// so they are left out: they show as "[picture]". Pictures from a web address keep the address.
+// The note is cleaned first (shared/noteContent.ts). Pictures from a web address keep the address.
+// Pictures pasted into a note are big, so their data is left out: given a way to find their
+// web address (shared/notePictures.ts), they show as a link to the picture, so an AI can open
+// it; otherwise (and for kinds that get no address, like SVG) they show as "[picture]".
 
 import { cleanNoteContent, isSafeLinkHref, youtubeSrc, type NoteNode } from './noteContent'
+
+/** The web address of a pasted picture (data:image/…), or null when it has none. */
+export type PictureAddress = (src: string) => string | null
+
+/** The cleaned note, with each pasted picture swapped for its web address (when it has one). */
+function cleanWithAddresses(content: unknown, address?: PictureAddress): NoteNode | null {
+  const doc = cleanNoteContent(content)
+  if (!doc || !address) return doc
+  // The cleaned note is a new copy, so it can be changed here.
+  const walk = (node: NoteNode) => {
+    const src = node.attrs?.src
+    if (node.type === 'image' && typeof src === 'string' && src.startsWith('data:')) {
+      const url = address(src)
+      if (url) node.attrs!.src = url
+    }
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return doc
+}
 
 const hasMark = (node: NoteNode, type: string) => (node.marks ?? []).some((m) => m.type === type)
 
@@ -161,8 +183,8 @@ function blocksMd(nodes: NoteNode[] | undefined): string[] {
 }
 
 /** A note as Markdown (empty for an empty note). */
-export function noteToMarkdown(content: unknown): string {
-  const doc = cleanNoteContent(content)
+export function noteToMarkdown(content: unknown, pictureAddress?: PictureAddress): string {
+  const doc = cleanWithAddresses(content, pictureAddress)
   return doc ? blocksMd(doc.content).join('\n\n').trim() : ''
 }
 
@@ -186,11 +208,21 @@ export function notePreview(content: unknown, max = 240): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
 }
 
-/** What "Copy for AI" copies: the name of the note, its view-only link, and the note as Markdown. */
-export function noteForAi(title: string, link: string, content: unknown): string {
+/**
+ * What "Copy for AI" copies: the name of the note, its view-only link, and the note as Markdown.
+ * Pasted pictures become links to the pictures (with `pictureAddress`), so the AI can open them.
+ */
+export function noteForAi(title: string, link: string, content: unknown, pictureAddress?: PictureAddress): string {
   const name = title.trim().replace(/\s+/g, ' ') || 'Untitled'
-  const body = noteToMarkdown(content)
-  return `# ${name}\n\nShared note: ${link}\n\n${body || '(This note is empty.)'}\n`
+  const doc = cleanWithAddresses(content, pictureAddress)
+  const body = doc ? blocksMd(doc.content).join('\n\n').trim() : ''
+  const pictures = doc && hasPictureLink(doc) ? '\nPictures in this note are links: open a link to see the picture.\n' : ''
+  return `# ${name}\n\nShared note: ${link}\n${pictures}\n${body || '(This note is empty.)'}\n`
+}
+
+/** Does the note have a picture with a web address? */
+function hasPictureLink(node: NoteNode): boolean {
+  return (node.type === 'image' && webPicture(node) !== null) || (node.content ?? []).some(hasPictureLink)
 }
 
 // ---------------------------------------------------------------------------------------
@@ -283,7 +315,7 @@ function blocksHtml(nodes: NoteNode[] | undefined): string {
 }
 
 /** A note as simple HTML (headings, lists, tables, links), all text escaped. */
-export function noteToHtml(content: unknown): string {
-  const doc = cleanNoteContent(content)
+export function noteToHtml(content: unknown, pictureAddress?: PictureAddress): string {
+  const doc = cleanWithAddresses(content, pictureAddress)
   return doc ? blocksHtml(doc.content) : ''
 }

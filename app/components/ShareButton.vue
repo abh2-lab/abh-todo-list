@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { BotIcon, CheckIcon, LinkIcon } from '@lucide/vue'
+import { notePicturePath } from '#shared/notePictures'
 import { noteForAi } from '#shared/noteText'
 // The Share button opens a small menu:
 // - Public note: copy its view link.
 // - Private note: turn the view-only link on or off, and copy it.
 // - Both: "Copy for AI" copies the note as text (with its link), ready to paste into an
-//   AI chat. For a private note it turns the view-only link on first.
+//   AI chat. Pasted pictures become links to the pictures, so the AI can open them.
+//   For a private note it turns the view-only link on first (the links need it).
 const props = defineProps<{
   docId: string | null
   isPrivate: boolean
@@ -60,9 +62,15 @@ function stopSharing() {
 
 /** The note as text with its link, for an AI chat. A private note gets its view-only link turned on. */
 function copyForAi() {
-  if (!props.docId) return
+  const docId = props.docId
+  if (!docId) return
   if (props.isPrivate && !props.shared) emit('set-shared', true)
-  void copy(noteForAi(props.title, viewLink(), props.content), 'ai')
+  // A pasted picture → its own web address (shared/notePictures.ts).
+  const pictureAddress = (src: string) => {
+    const path = notePicturePath(docId, src)
+    return path && `${window.location.origin}${path}`
+  }
+  void copy(noteForAi(props.title, viewLink(), props.content, pictureAddress), 'ai')
 }
 
 onBeforeUnmount(() => { if (copiedTimer) clearTimeout(copiedTimer) })
@@ -121,7 +129,7 @@ onBeforeUnmount(() => { if (copiedTimer) clearTimeout(copiedTimer) })
           {{ copied === 'ai' ? 'Copied for AI!' : 'Copy for AI' }}
         </button>
         <p class="text-2xs text-[#555] leading-relaxed mt-2">
-          Copies the note as text, with its link, to paste into an AI chat (ChatGPT, Claude…).
+          Copies the note as text, with links to the note and its pictures, to paste into an AI chat (ChatGPT, Claude…).
           <template v-if="isPrivate && !shared">This turns the view-only link on.</template>
         </p>
       </div>
